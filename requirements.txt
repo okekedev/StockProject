@@ -18,3 +18,6 @@ seaborn>=0.11.0
 
 # Development and Testing
 pytest>=6.2.0
+
+Details of the Short-Term Buy Confidence Score (STBCS)
+How STBCS Works
