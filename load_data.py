@@ -15,7 +15,7 @@ df = df.dropna(subset=['Target_Price_Change_1'])
 # Features
 features = [
     'TSMN', 'Close_Volatility', 'RSI_5', 'RSI_20', 'SP500', 'Volume', 'Market_Sentiment',
-    'Close', 'MarketCap', 'Price_Change'
+    'Close', 'MarketCap', 'Price_Change', 'Close_Diff_1'
 ]
 
 # Function to predict price change for one day ahead
@@ -39,7 +39,7 @@ def predict_one_day(symbol, df, features, prediction_date='2025-02-25', train_st
     X_train_scaled = scaler.fit_transform(X_train)
     
     # Train model
-    model = HistGradientBoostingRegressor(random_state=42, max_iter=200, max_depth=3, learning_rate=0.05)
+    model = HistGradientBoostingRegressor(random_state=42, max_iter=300, max_depth=3, learning_rate=0.05)
     model.fit(X_train_scaled, y_train)
     
     # Prepare features for prediction
@@ -53,10 +53,10 @@ def predict_one_day(symbol, df, features, prediction_date='2025-02-25', train_st
     
     # Predict and scale
     pred_change = model.predict(X_pred_scaled)[0]
-    volatility = pred_day_data['Close_Volatility'].values[0]  # Use day’s volatility
-    pred_change = pred_change * min(volatility, 3)  # Cap at 3
+    volatility = train_data['Close_Volatility'].tail(3).mean()  # 3-day average
+    pred_change = pred_change * volatility  # No cap
     
-    # Actual next day (will be None for Feb 26 since data ends at Feb 25)
+    # Actual next day
     next_day = symbol_data[symbol_data['Date'] == prediction_date + timedelta(days=1)]
     actual_change = next_day['Price_Change'].iloc[0] if not next_day.empty else None
     
@@ -69,7 +69,7 @@ def predict_one_day(symbol, df, features, prediction_date='2025-02-25', train_st
         'Type': ['Actual'] * 3 + ['Predicted']
     })
     
-    # Accuracy check (skipped if no actual)
+    # Accuracy check
     if actual_change is not None:
         trend_correct = (actual_change > 0) == (pred_change > 0)
         error = abs(actual_change - pred_change)
