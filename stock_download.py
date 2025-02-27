@@ -85,26 +85,47 @@ def download_and_get_data():
             if not download_button:
                 raise Exception("Could not find download button")
                 
+            # List existing CSV files in the directory before the download
+            existing_files = set(glob.glob(os.path.join(output_dir, "*.csv")))
+            print("Existing CSV files before download:", existing_files)
+            
             print("Clicking download button...")
             driver.execute_script("arguments[0].click();", download_button)
             
             print("Waiting for download...")
             timeout = 60
             start_time = datetime.now()
+            downloaded_file = None
+            
             while (datetime.now() - start_time).seconds < timeout:
-                csv_files = glob.glob(os.path.join(output_dir, "*.csv"))
-                if csv_files:
-                    downloaded_file = csv_files[0]
-                    print(f"Found file: {downloaded_file}")
-                    # Rename the downloaded file to nasdaq_screener.csv
-                    os.rename(downloaded_file, output_path)
-                    print(f"Renamed to: {output_path}")
-                    df = pd.read_csv(output_path)
-                    print(f"Pandas read {len(df)} records")
-                    return df
+                # List all CSV files after the download attempt
+                current_files = set(glob.glob(os.path.join(output_dir, "*.csv")))
+                # Find new files by comparing with existing files
+                new_files = current_files - existing_files
+                
+                if new_files:
+                    downloaded_file = new_files.pop()
+                    # Ensure we don't pick up unrelated files like test_stock_accuracy.csv
+                    # Check if the filename suggests it's the NASDAQ screener file
+                    if ("nasdaq" in downloaded_file.lower() or "screener" in downloaded_file.lower()) and "test_stock_accuracy" not in downloaded_file.lower():
+                        print(f"Found downloaded file: {downloaded_file}")
+                        # Move the downloaded file to nasdaq_screener.csv
+                        os.rename(downloaded_file, output_path)
+                        print(f"Moved to: {output_path}")
+                        df = pd.read_csv(output_path)
+                        # Ensure 'IPO Year' column if 'IPOyear' exists
+                        if 'IPOyear' in df.columns:
+                            df = df.rename(columns={'IPOyear': 'IPO Year'})
+                        # Add Data_Date column
+                        df['Data_Date'] = pd.to_datetime('today').strftime('%Y-%m-%d')
+                        df.to_csv(output_path, index=False)
+                        print(f"Pandas read {len(df)} records")
+                        return df
+                    else:
+                        print(f"Ignoring unrelated file: {downloaded_file}")
                 time.sleep(1)
             
-            raise Exception("Download timed out or file not found")
+            raise Exception("Download timed out or no valid NASDAQ screener file found")
         
         except Exception as e:
             print(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}")
