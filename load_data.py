@@ -15,11 +15,11 @@ df = df.dropna(subset=['Target_Price_Change_1'])
 # Features
 features = [
     'TSMN', 'Close_Volatility', 'RSI_5', 'RSI_20', 'SP500', 'Volume', 'Market_Sentiment',
-    'Close', 'MarketCap'
+    'Close', 'MarketCap', 'Price_Change'
 ]
 
 # Function to predict price change for one day ahead
-def predict_one_day(symbol, df, features, prediction_date='2025-02-20', train_start_date='2024-08-01'):
+def predict_one_day(symbol, df, features, prediction_date='2025-02-25', train_start_date='2024-02-01'):
     symbol_data = df[df['Symbol'] == symbol]
     if symbol_data.empty:
         print(f"No data found for {symbol}")
@@ -38,8 +38,8 @@ def predict_one_day(symbol, df, features, prediction_date='2025-02-20', train_st
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     
-    # Train model with tuned parameters
-    model = HistGradientBoostingRegressor(random_state=42, max_iter=100, max_depth=3, learning_rate=0.1)
+    # Train model
+    model = HistGradientBoostingRegressor(random_state=42, max_iter=200, max_depth=3, learning_rate=0.05)
     model.fit(X_train_scaled, y_train)
     
     # Prepare features for prediction
@@ -51,12 +51,12 @@ def predict_one_day(symbol, df, features, prediction_date='2025-02-20', train_st
     X_pred = pred_day_data[features].fillna(pred_day_data[features].median())
     X_pred_scaled = scaler.transform(X_pred)
     
-    # Predict and scale with smoothed volatility
+    # Predict and scale
     pred_change = model.predict(X_pred_scaled)[0]
-    volatility = train_data['Close_Volatility'].tail(5).mean()  # 5-day average for stability
-    pred_change = pred_change * min(volatility, 10)  # Cap at 10 to avoid extremes
+    volatility = pred_day_data['Close_Volatility'].values[0]  # Use day’s volatility
+    pred_change = pred_change * min(volatility, 3)  # Cap at 3
     
-    # Actual next day
+    # Actual next day (will be None for Feb 26 since data ends at Feb 25)
     next_day = symbol_data[symbol_data['Date'] == prediction_date + timedelta(days=1)]
     actual_change = next_day['Price_Change'].iloc[0] if not next_day.empty else None
     
@@ -69,11 +69,13 @@ def predict_one_day(symbol, df, features, prediction_date='2025-02-20', train_st
         'Type': ['Actual'] * 3 + ['Predicted']
     })
     
-    # Quick accuracy check
+    # Accuracy check (skipped if no actual)
     if actual_change is not None:
         trend_correct = (actual_change > 0) == (pred_change > 0)
         error = abs(actual_change - pred_change)
         print(f"Trend Correct: {trend_correct}, Absolute Error: {error:.4f}")
+    else:
+        print(f"Prediction for {symbol} on {prediction_date + timedelta(days=1)}: {pred_change:.4f}")
     
     return result
 
@@ -81,10 +83,10 @@ def predict_one_day(symbol, df, features, prediction_date='2025-02-20', train_st
 symbols_df = pd.read_csv('./stock_data/stock_symbols.csv')
 symbols = symbols_df['Symbol'].tolist()
 
-# Predict for Feb 21 based on Feb 20
-prediction_date = '2025-02-20'
+# Predict for Feb 26 based on Feb 25
+prediction_date = '2025-02-25'
 for symbol in symbols:
     result = predict_one_day(symbol, df, features, prediction_date)
     if result is not None:
-        print(f"\n{symbol} - Last 3 Days Actual and Next Day Prediction (Feb 21):")
+        print(f"\n{symbol} - Last 3 Days Actual and Next Day Prediction (Feb 26):")
         print(result)
