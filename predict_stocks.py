@@ -6,9 +6,33 @@ from datetime import datetime, timedelta
 import sys
 import os
 
-# Load data
-df = pd.read_csv('./stock_data/stock_data_technical.csv')
+# File paths
+TECH_DATA_FILE = "./stock_data/stock_data_technical.csv"
+TEST_STOCK_ACCURACY = "./stock_data/test_stock_accuracy.csv"
+
+# Load historical data
+df = pd.read_csv(TECH_DATA_FILE)
 df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+
+# Load accuracy data
+def load_accuracy_data():
+    if os.path.exists(TEST_STOCK_ACCURACY):
+        try:
+            accuracy_df = pd.read_csv(TEST_STOCK_ACCURACY)
+            # Ensure necessary columns are present
+            if 'Symbol' in accuracy_df.columns and 'Accuracy_%' in accuracy_df.columns:
+                return accuracy_df[['Symbol', 'Accuracy_%']]
+            else:
+                print(f"Warning: {TEST_STOCK_ACCURACY} does not contain required columns 'Symbol' and 'Accuracy_%'. Using default accuracy of 50%.")
+                return pd.DataFrame(columns=['Symbol', 'Accuracy_%'])
+        except Exception as e:
+            print(f"Error loading {TEST_STOCK_ACCURACY}: {e}. Using default accuracy of 50%.")
+            return pd.DataFrame(columns=['Symbol', 'Accuracy_%'])
+    else:
+        print(f"Warning: {TEST_STOCK_ACCURACY} not found. Using default accuracy of 50%.")
+        return pd.DataFrame(columns=['Symbol', 'Accuracy_%'])
+
+accuracy_df = load_accuracy_data()
 
 # Create target (shifted price change for training, will be NaN for the last row)
 df['Target_Price_Change_1'] = df['Price_Change'].shift(-1)
@@ -21,7 +45,7 @@ features = [
 ]
 
 # Function to predict price change for one day ahead
-def predict_one_day(symbol, df, features, prediction_date, train_start_date='2020-01-01'):
+def predict_one_day(symbol, df, features, prediction_date, target_date, train_start_date='2020-01-01'):
     symbol_data = df[df['Symbol'] == symbol].copy()
     if symbol_data.empty:
         return None
@@ -79,7 +103,7 @@ def predict_one_day(symbol, df, features, prediction_date, train_start_date='202
     return {
         'Symbol': symbol,
         'Prediction_Date': pred_date.strftime('%Y-%m-%d'),
-        'Target_Date': (pred_date + timedelta(days=1)).strftime('%Y-%m-%d'),
+        'Target_Date': target_date.strftime('%Y-%m-%d'),
         'Close': close_price,
         'Predicted_Price_Change': pred_change,
         'percent_predicted_change': percent_change
@@ -104,7 +128,7 @@ def run_predictions():
     # Make predictions for the next business day
     predictions = []
     for symbol in symbols:
-        result = predict_one_day(symbol, df, features, prediction_date)
+        result = predict_one_day(symbol, df, features, prediction_date, target_date)
         if result is not None:
             predictions.append(result)
     
@@ -112,8 +136,20 @@ def run_predictions():
     if predictions:
         predictions_df = pd.DataFrame(predictions)
         
-        # Sort by predicted percentage change (descending) and select top 10
-        predictions_df = predictions_df.sort_values(by='percent_predicted_change', ascending=False)
+        # Merge with accuracy data
+        if not accuracy_df.empty:
+            predictions_df = predictions_df.merge(accuracy_df, on='Symbol', how='left')
+            # Fill missing accuracy with a default value (e.g., 50%)
+            predictions_df['Accuracy_%'] = predictions_df['Accuracy_%'].fillna(50.0)
+        else:
+            # If no accuracy data is available, use a default accuracy of 50%
+            predictions_df['Accuracy_%'] = 50.0
+        
+        # Calculate the new metric: percent_predicted_change * (Accuracy_% / 100)
+        predictions_df['weighted_movement'] = predictions_df['percent_predicted_change'] * (predictions_df['Accuracy_%'] / 100)
+        
+        # Sort by weighted_movement (descending) and select top 10
+        predictions_df = predictions_df.sort_values(by='weighted_movement', ascending=False)
         top_picks_df = predictions_df.head(10)
         
         # Save all results to CSV, overwriting the file
@@ -125,7 +161,7 @@ def run_predictions():
         # Print all results to terminal
         print(f"Top 10 Predictions for {target_date.strftime('%Y-%m-%d')} (using data from {prediction_date.strftime('%Y-%m-%d')}):")
         print("\nDetailed prediction results:")
-        print(top_picks_df[['Symbol', 'Prediction_Date', 'Target_Date', 'Close', 'Predicted_Price_Change', 'percent_predicted_change']].to_string(index=False))
+        print(top_picks_df[['Symbol', 'Prediction_Date', 'Target_Date', 'Close', 'Predicted_Price_Change', 'percent_predicted_change', 'Accuracy_%', 'weighted_movement']].to_string(index=False))
     else:
         # Save an empty CSV if no predictions
         output_path = './stock_data/top_10_upward_picks.csv'

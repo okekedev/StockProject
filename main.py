@@ -32,20 +32,20 @@ def load_data(file_path, default_columns=None):
     return pd.DataFrame()
 
 # Global DataFrames
-screener_df = load_data(INPUT_FILE, ['Symbol', 'Name', 'Last Sale', 'Volume', 'Market Cap', 'Sector', 'Industry', 'Data_Date'])
+screener_df = load_data(INPUT_FILE, ['Symbol', 'Name', 'Last Sale', 'Volume', 'Market Cap', 'Sector', 'Industry', 'Data_Date', 'IPO Year'])
 symbols_df = load_data(OUTPUT_FILE, ['Symbol'])
 tech_df = load_data(TECH_DATA_FILE, ['Symbol', 'Date', 'Close', 'Price_Change', 'TSMN', 'Close_Volatility', 'RSI_5', 'RSI_20', 'SP500', 'Volume', 'Market_Sentiment', 'MarketCap'])
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-# Criteria for dropdowns
+# Criteria for dropdowns, safely accessing columns with fallbacks
 criteria = {
-    'IPO Year': sorted(screener_df['IPO Year'].dropna().astype(int).unique().tolist()),
-    'Last Sale': sorted(screener_df['Last Sale'].dropna().unique().tolist()),
-    'Market Cap': sorted(screener_df['Market Cap'].dropna().unique().tolist()),
-    'Sector': sorted(screener_df['Sector'].dropna().unique().tolist()),
-    'Industry': sorted(screener_df['Industry'].dropna().unique().tolist()),
-    'Volume': sorted(screener_df['Volume'].dropna().astype(int).unique().tolist())
+    'IPO Year': sorted(screener_df['IPO Year'].dropna().astype(int).unique().tolist()) if 'IPO Year' in screener_df.columns else [],
+    'Last Sale': sorted(screener_df['Last Sale'].dropna().unique().tolist()) if 'Last Sale' in screener_df.columns else [],
+    'Market Cap': sorted(screener_df['Market Cap'].dropna().unique().tolist()) if 'Market Cap' in screener_df.columns else [],
+    'Sector': sorted(screener_df['Sector'].dropna().unique().tolist()) if 'Sector' in screener_df.columns else [],
+    'Industry': sorted(screener_df['Industry'].dropna().unique().tolist()) if 'Industry' in screener_df.columns else [],
+    'Volume': sorted(screener_df['Volume'].dropna().astype(int).unique().tolist()) if 'Volume' in screener_df.columns else []
 }
 
 # Function to generate date options for Test Model tab, excluding weekends and Mondays, limiting to 3 days before tomorrow
@@ -82,15 +82,15 @@ def get_date_options(start_date, end_date, default_date=None):
         default_value = valid_dates[-1].strftime('%Y-%m-%d') if len(valid_dates) > 0 else None  # Default to most recent valid day
     return options, default_value
 
-# Function to generate end date options for Test Model tab based on start date (up to 2 weeks)
+# Function to generate end date options for Test Model tab based on start date (up to 30 days)
 def get_end_date_options(start_date, max_end_date):
     if not start_date:
         return [], None
     start_date = pd.to_datetime(start_date)
     max_end_date = pd.to_datetime(max_end_date)
-    # Limit to 2 weeks (14 days) from start date or max_end_date, whichever is earlier
-    two_weeks_later = start_date + timedelta(days=14)
-    end_date_limit = min(max_end_date, two_weeks_later)
+    # Limit to 30 days from start date or max_end_date, whichever is earlier
+    one_month_later = start_date + timedelta(days=30)  # Changed from 14 to 30 days
+    end_date_limit = min(max_end_date, one_month_later)
     if start_date >= end_date_limit:
         return [], None
     dates = pd.date_range(start=start_date + timedelta(days=1), end=end_date_limit, freq='B')
@@ -173,7 +173,7 @@ app.layout = html.Div([
             placeholder="Select start date for testing",
             clearable=False
         ),
-        html.Label("Select Target End Date (up to 2 weeks from start, Tuesday to Friday):"),
+        html.Label("Select Target End Date (up to 30 days from start, Tuesday to Friday):"),
         dcc.Dropdown(
             id='test-end-date',
             options=get_end_date_options(datetime.now() + timedelta(days=1), datetime.now() + timedelta(days=1))[0],
@@ -188,7 +188,8 @@ app.layout = html.Div([
     # Predict Stocks View
     html.Div([
         html.H4("Predict Stock Changes"),
-        html.P(f"Predicting for the next business day: {((datetime.now().date() + timedelta(days=1)).strftime('%Y-%m-%d'))}"),
+        html.P(f"Predicting for the next business day: {(datetime.now().date() + timedelta(days=1)).strftime('%Y-%m-%d')}"),
+        html.P("Note: For accurate next-day predictions, run Fetch Technical Data (Step 2) after 6-7 PM PST to ensure the latest trading day's data is available. The prediction uses the latest available day's data to forecast the next business day's movement.", style={'color': 'red'}),
         html.Button("Run Predictions", id='predict-button', n_clicks=0),
         html.Pre(id='predict-table')  # Simplified to show table only, no graph
     ], id='predict-content', style={'display': 'none'}),
@@ -281,25 +282,25 @@ def save_selection(n_clicks, mode, manual_symbols, min_ipo, max_ipo, min_price, 
             return "Please select at least one symbol."
         filtered_df = pd.DataFrame({'Symbol': manual_symbols})
     else:
-        if min_ipo:
+        if min_ipo and 'IPO Year' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['IPO Year'] >= int(min_ipo)]
-        if max_ipo:
+        if max_ipo and 'IPO Year' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['IPO Year'] <= int(max_ipo)]
-        if min_price:
+        if min_price and 'Last Sale' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['Last Sale'] >= float(min_price)]
-        if max_price:
+        if max_price and 'Last Sale' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['Last Sale'] <= float(max_price)]
-        if min_cap:
+        if min_cap and 'Market Cap' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['Market Cap'] >= float(min_cap)]
-        if max_cap:
+        if max_cap and 'Market Cap' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['Market Cap'] <= float(max_cap)]
-        if min_volume:
+        if min_volume and 'Volume' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['Volume'] >= int(min_volume)]
-        if max_volume:
+        if max_volume and 'Volume' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['Volume'] <= int(max_volume)]
-        if sector:
+        if sector and 'Sector' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['Sector'] == sector]
-        if industry:
+        if industry and 'Industry' in filtered_df.columns:
             filtered_df = filtered_df[filtered_df['Industry'] == industry]
         filtered_df = filtered_df[['Symbol']]
     
@@ -341,8 +342,8 @@ def update_predict(n_clicks, tab):
         
         if not predictions_df.empty:
             target_date = predictions_df['Target_Date'].iloc[0]  # Get the target date from the predictions
-            return html.Pre(f"Top 10 Predictions for {target_date}:\n" + predictions_df.to_string(index=False))
-        return "No predictions generated. Check if data is available."
+            return html.Pre(f"Top 10 Predictions for {target_date} (sorted by weighted movement = percent_predicted_change * (Accuracy_% / 100)):\n" + predictions_df.to_string(index=False))
+        return "No predictions generated. Check if data is available or run Test Model (Step 3) to generate accuracy data."
     
     except subprocess.CalledProcessError as e:
         print(f"Script error: {e.stderr}")
