@@ -1,0 +1,42 @@
+# Ignore generated CSV files in the stock_data directory
+stock_data/*.csv
+
+# Ignore temporary files and directories
+*.tmp
+*.log
+*.cache
+*.csv
+
+# Ignore Python-related artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Ignore dependency directories
+env/
+venv/
+.virtualenv/
+.pipenv/
+.env/
+.venv/
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore browser-related files (from Selenium)
+chromedriver.log
+
+# Ignore IDE-specific files (e.g., VS Code)
+.vscode/
+*.code-workspace
+
+# Ignore sensitive files
+*.key
+*.pem
+*.env
+secrets/
