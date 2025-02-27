@@ -48,7 +48,7 @@ criteria = {
     'Volume': sorted(screener_df['Volume'].dropna().astype(int).unique().tolist())
 }
 
-# Function to generate date options, excluding weekends and Mondays, limiting to 3 days before tomorrow
+# Function to generate date options for Test Model tab, excluding weekends and Mondays, limiting to 3 days before tomorrow
 def get_date_options(start_date, end_date, default_date=None):
     # Convert start_date and end_date to date objects if they are datetime
     if isinstance(start_date, datetime):
@@ -82,7 +82,7 @@ def get_date_options(start_date, end_date, default_date=None):
         default_value = valid_dates[-1].strftime('%Y-%m-%d') if len(valid_dates) > 0 else None  # Default to most recent valid day
     return options, default_value
 
-# Function to generate end date options based on start date (up to 2 weeks)
+# Function to generate end date options for Test Model tab based on start date (up to 2 weeks)
 def get_end_date_options(start_date, max_end_date):
     if not start_date:
         return [], None
@@ -188,39 +188,11 @@ app.layout = html.Div([
     # Predict Stocks View
     html.Div([
         html.H4("Predict Stock Changes"),
-        html.Label("Select Target Start Date (up to 3 days before tomorrow):"),
-        dcc.Dropdown(
-            id='predict-start-date',
-            options=get_date_options(datetime(2020, 1, 2), datetime.now() + timedelta(days=1))[0],
-            value=get_date_options(datetime(2020, 1, 2), datetime.now() + timedelta(days=1))[1],
-            placeholder="Select start date for predictions",
-            clearable=False
-        ),
-        html.Label("Select Target End Date (up to 2 weeks from start, max 3 days before tomorrow):"),
-        dcc.Dropdown(
-            id='predict-end-date',
-            options=get_end_date_options(datetime.now() + timedelta(days=1), datetime.now() + timedelta(days=1))[0],
-            value=get_end_date_options(datetime.now() + timedelta(days=1), datetime.now() + timedelta(days=1))[1],
-            placeholder="Select end date for predictions",
-            clearable=False
-        ),
+        html.P(f"Predicting for the next business day: {((datetime.now().date() + timedelta(days=1)).strftime('%Y-%m-%d'))}"),
         html.Button("Run Predictions", id='predict-button', n_clicks=0),
         html.Pre(id='predict-table')  # Simplified to show table only, no graph
     ], id='predict-content', style={'display': 'none'}),
 ])
-
-# Callback to update end date options for Predict Stocks based on start date
-@app.callback(
-    [Output('predict-end-date', 'options'),
-     Output('predict-end-date', 'value')],
-    Input('predict-start-date', 'value')
-)
-def update_predict_end_date_options(start_date):
-    if not start_date:
-        return [], None
-    max_end_date = datetime.now() - timedelta(days=2)  # 3 days before tomorrow
-    options, default_value = get_end_date_options(start_date, max_end_date)
-    return options, default_value
 
 # Callback to update end date options for Test Model based on start date
 @app.callback(
@@ -339,37 +311,25 @@ def save_selection(n_clicks, mode, manual_symbols, min_ipo, max_ipo, min_price, 
     filtered_df.to_csv(OUTPUT_FILE, index=False)
     return f"Saved {len(filtered_df)} symbols to {OUTPUT_FILE}"
 
-# Predict Stocks Callbacks
+# Predict Stocks Callback
 @app.callback(
     Output('predict-table', 'children'),
     Input('predict-button', 'n_clicks'),
-    State('predict-start-date', 'value'),
-    State('predict-end-date', 'value'),
     State('tabs', 'value')
 )
-def update_predict(n_clicks, start_date, end_date, tab):
+def update_predict(n_clicks, tab):
     if n_clicks == 0 or tab != 'predict':
         return ""
     
-    if not start_date or not end_date:
-        return "Please select both a start date and an end date."
-    
-    # Validate date range
-    start_date_dt = datetime.strptime(start_date, '%Y-%m-%d')
-    end_date_dt = datetime.strptime(end_date, '%Y-%m-%d')
-    
-    if start_date_dt >= end_date_dt:
-        return "Start date must be before end date."
-    
-    # Run the entire predict_stocks.py script with the date range as arguments
+    # Run the entire predict_stocks.py script (no date arguments since it predicts for the next day)
     script_path = os.path.join(os.path.dirname(__file__), "predict_stocks.py")
     if not os.path.exists(script_path):
         return "Error: predict_stocks.py not found."
     
     try:
-        # Use subprocess to run the script with start_date and end_date
+        # Use subprocess to run the script
         result = subprocess.run(
-            ['python', script_path, start_date, end_date],  # Pass both dates as command-line arguments
+            ['python', script_path],  # No date arguments needed
             capture_output=True,
             text=True,
             check=True
@@ -380,8 +340,9 @@ def update_predict(n_clicks, start_date, end_date, tab):
         predictions_df = load_data(PREDICTION_OUTPUT)
         
         if not predictions_df.empty:
-            return html.Pre(f"Predictions for {start_date} to {end_date}:\n" + predictions_df.to_string(index=False))
-        return "No predictions generated. Check if data is available for the selected dates."
+            target_date = predictions_df['Target_Date'].iloc[0]  # Get the target date from the predictions
+            return html.Pre(f"Top 10 Predictions for {target_date}:\n" + predictions_df.to_string(index=False))
+        return "No predictions generated. Check if data is available."
     
     except subprocess.CalledProcessError as e:
         print(f"Script error: {e.stderr}")

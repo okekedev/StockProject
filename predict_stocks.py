@@ -76,86 +76,64 @@ def predict_one_day(symbol, df, features, prediction_date, train_start_date='202
     # Calculate predicted percentage change
     percent_change = (pred_change / close_price) * 100 if close_price != 0 else 0
     
-    # Get actual change for the next day
-    actual_change = symbol_data[symbol_data['Date'] == pred_date + timedelta(days=1)]['Price_Change']
-    actual_change = actual_change.iloc[0] if not actual_change.empty else np.nan
-    
-    # Calculate actual percentage change
-    actual_percent_change = (actual_change / close_price) * 100 if close_price != 0 and not pd.isna(actual_change) else np.nan
-    
     return {
         'Symbol': symbol,
         'Prediction_Date': pred_date.strftime('%Y-%m-%d'),
         'Target_Date': (pred_date + timedelta(days=1)).strftime('%Y-%m-%d'),
         'Close': close_price,
         'Predicted_Price_Change': pred_change,
-        'percent_predicted_change': percent_change,
-        'Actual_%_Change': actual_percent_change
+        'percent_predicted_change': percent_change
     }
 
-def run_predictions(target_start_date, target_end_date):
+def run_predictions():
     # Load symbols
     symbols_df = pd.read_csv('./stock_data/stock_symbols.csv')
     symbols = symbols_df['Symbol'].tolist()
     
-    # Convert target dates to prediction dates (day before)
-    target_start_date = pd.to_datetime(target_start_date)
-    target_end_date = pd.to_datetime(target_end_date)
-    prediction_start_date = target_start_date - timedelta(days=1)
-    prediction_end_date = target_end_date - timedelta(days=1)
+    # Determine the next business day for prediction
+    today = datetime.now().date()
+    target_date = today + timedelta(days=1)
     
-    # Generate prediction dates (business days only)
-    dates = pd.date_range(start=prediction_start_date, end=prediction_end_date, freq='B')  # Business days
+    # Adjust target_date to the next business day (skip weekends)
+    while target_date.weekday() in [5, 6]:  # Saturday or Sunday
+        target_date += timedelta(days=1)
     
-    # Make predictions for each date
-    all_predictions = []
-    for pred_date in dates:
-        target_date = pred_date + timedelta(days=1)
-        predictions = []
-        for symbol in symbols:
-            result = predict_one_day(symbol, df, features, pred_date)
-            if result is not None:
-                predictions.append(result)
-        
-        if predictions:
-            predictions_df = pd.DataFrame(predictions)
-            all_predictions.append(predictions_df)
+    # Prediction date is the day before the target date
+    prediction_date = target_date - timedelta(days=1)
+    
+    # Make predictions for the next business day
+    predictions = []
+    for symbol in symbols:
+        result = predict_one_day(symbol, df, features, prediction_date)
+        if result is not None:
+            predictions.append(result)
     
     # Combine all predictions
-    if all_predictions:
-        final_df = pd.concat(all_predictions, ignore_index=True)
-        upward_predictions = final_df[final_df['percent_predicted_change'] > 0]
-        total_days = len(final_df['Prediction_Date'].unique())
-        upward_days = len(upward_predictions['Prediction_Date'].unique())
+    if predictions:
+        predictions_df = pd.DataFrame(predictions)
+        
+        # Sort by predicted percentage change (descending) and select top 10
+        predictions_df = predictions_df.sort_values(by='percent_predicted_change', ascending=False)
+        top_picks_df = predictions_df.head(10)
         
         # Save all results to CSV, overwriting the file
         output_path = './stock_data/top_10_upward_picks.csv'
         if os.path.exists(output_path):
             os.remove(output_path)  # Overwrite existing file
-        final_df.to_csv(output_path, index=False)
+        top_picks_df.to_csv(output_path, index=False)
         
         # Print all results to terminal
-        print(f"Predictions for target dates {target_start_date.strftime('%Y-%m-%d')} to {target_end_date.strftime('%Y-%m-%d')} (using data from {prediction_start_date.strftime('%Y-%m-%d')} to {prediction_end_date.strftime('%Y-%m-%d')}):")
-        print(f"Total prediction days: {total_days}")
-        print(f"Days with upward predictions: {upward_days} out of {total_days} ({(upward_days / total_days * 100):.2f}%)")
+        print(f"Top 10 Predictions for {target_date.strftime('%Y-%m-%d')} (using data from {prediction_date.strftime('%Y-%m-%d')}):")
         print("\nDetailed prediction results:")
-        print(final_df[['Symbol', 'Prediction_Date', 'Target_Date', 'Close', 'Predicted_Price_Change', 'percent_predicted_change', 'Actual_%_Change']].to_string(index=False))
+        print(top_picks_df[['Symbol', 'Prediction_Date', 'Target_Date', 'Close', 'Predicted_Price_Change', 'percent_predicted_change']].to_string(index=False))
     else:
         # Save an empty CSV if no predictions
         output_path = './stock_data/top_10_upward_picks.csv'
         if os.path.exists(output_path):
             os.remove(output_path)
-        pd.DataFrame(columns=['Symbol', 'Prediction_Date', 'Target_Date', 'Close', 'Predicted_Price_Change', 'percent_predicted_change', 'Actual_%_Change']).to_csv(output_path, index=False)
-        print(f"Predictions for target dates {target_start_date.strftime('%Y-%m-%d')} to {target_end_date.strftime('%Y-%m-%d')} (using data from {prediction_start_date.strftime('%Y-%m-%d')} to {prediction_end_date.strftime('%Y-%m-%d')}):")
+        pd.DataFrame(columns=['Symbol', 'Prediction_Date', 'Target_Date', 'Close', 'Predicted_Price_Change', 'percent_predicted_change']).to_csv(output_path, index=False)
+        print(f"Predictions for {target_date.strftime('%Y-%m-%d')} (using data from {prediction_date.strftime('%Y-%m-%d')}):")
         print("No predictions generated due to data issues.")
 
 if __name__ == "__main__":
-    # Get date range from command-line arguments or default
-    target_start_date = '2025-02-27'  # Default target start date
-    target_end_date = '2025-02-28'    # Default target end date
-    if len(sys.argv) > 1:
-        target_start_date = sys.argv[1]
-    if len(sys.argv) > 2:
-        target_end_date = sys.argv[2]
-    
-    run_predictions(target_start_date, target_end_date)
+    run_predictions()
