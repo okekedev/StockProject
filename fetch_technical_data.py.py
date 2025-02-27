@@ -3,43 +3,54 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
 import os
-import time  # For retry logic
+import time
 
-def fetch_technical_data_to_csv(symbols, start_date="2020-01-01", end_date=None, output_file="stock_data_technical.csv"):
+def fetch_technical_data_to_csv(symbols_file, start_date="2020-01-01", end_date=None, output_file="stock_data_technical.csv"):
     """
-    Fetch technical data (OHLCV, splits, MarketCap, SP500, and indicators) using yfinance, save to CSV, excluding dividends, 
-    quarterly fundamentals, and S&P 500 correlation, with 20-day and 5-day RSIs and the Temporal-Spectral Momentum Nexus (TSMN) for short-term analysis.
+    Fetch technical data (OHLCV, splits, MarketCap, SP500, and enhanced indicators) using yfinance, save to CSV,
+    excluding dividends and quarterly fundamentals, with multiple RSIs, TSMN with spectral analysis, price derivatives,
+    volatility, market sentiment, and daily price change for short-term analysis.
     """
     if end_date is None:
         end_date = datetime.now().strftime('%Y-%m-%d')
     
+    # Read stock symbols from CSV
+    try:
+        symbols_df = pd.read_csv(symbols_file)
+        if 'Symbol' not in symbols_df.columns:
+            raise ValueError("CSV must contain a 'Symbol' column")
+        symbols = symbols_df['Symbol'].tolist()
+        print(f"Loaded {len(symbols)} symbols from {symbols_file}: {symbols}")
+    except Exception as e:
+        print(f"Error reading symbols from {symbols_file}: {e}")
+        return
+    
     all_data = pd.DataFrame()
     
-    # Buffer for technical indicators (20 days for RSI_20, 5 days for RSI_5 and TSMN)
-    buffer_days = 20  # Maintain 20 days to support 20-day RSI and custom indicators
+    # Buffer for technical indicators (60 days for RSI_60, 5 days for TSMN)
+    buffer_days = 60
     fetch_start = (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=buffer_days)).strftime('%Y-%m-%d')
     
-    # Fetch S&P 500 (included in output, no correlation calculated)
+    # Fetch S&P 500
     try:
         sp500 = yf.Ticker('^GSPC').history(start=fetch_start, end=end_date).reset_index()
         sp500['Date'] = pd.to_datetime(sp500['Date']).dt.tz_localize(None)
-        sp500 = sp500[['Date', 'Close']].rename(columns={'Close': 'SP500'})  # Rename immediately
+        sp500 = sp500[['Date', 'Close']].rename(columns={'Close': 'SP500'})
     except Exception as e:
         print(f"Error fetching S&P 500 data: {e}")
-        sp500 = pd.DataFrame(columns=['Date', 'SP500'])  # Empty DataFrame as fallback
+        sp500 = pd.DataFrame(columns=['Date', 'SP500'])
     
     for symbol in symbols:
         print(f"Fetching technical data for {symbol}...")
         stock = yf.Ticker(symbol)
         
-        # Historical OHLCV data with retry and adjusted date range for delisted stocks
+        # Historical OHLCV data with retry
         max_retries = 3
-        retry_delay = 5  # seconds
+        retry_delay = 5
         for attempt in range(max_retries):
             try:
                 df_history = stock.history(start=fetch_start, end=end_date)
                 if df_history.empty:
-                    # Try a narrower date range if initial fetch fails (e.g., start from 2020-01-01)
                     adjusted_start = "2020-01-01"
                     adjusted_fetch_start = (datetime.strptime(adjusted_start, '%Y-%m-%d') - timedelta(days=buffer_days)).strftime('%Y-%m-%d')
                     df_history = stock.history(start=adjusted_fetch_start, end=end_date)
@@ -63,52 +74,56 @@ def fetch_technical_data_to_csv(symbols, start_date="2020-01-01", end_date=None,
         df_history = df_history[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']]
         df_history['Symbol'] = symbol
         
-        # Remove dividends (no longer included)
-        
         # Stock splits
         splits = stock.splits.reset_index()
         splits.columns = ['Date', 'StockSplits']
         splits['Date'] = pd.to_datetime(splits['Date']).dt.tz_localize(None)
         df_history = df_history.merge(splits, on='Date', how='left').fillna({'StockSplits': 0})
         
-        # Fundamentals (keeping only MarketCap, added before custom indicators)
+        # Fundamentals (MarketCap only)
         info = stock.info
-        fundamentals = {
-            'MarketCap': info.get('marketCap', np.nan),
-        }
-        for key, value in fundamentals.items():
-            df_history[key] = value  # Add MarketCap to df_history before calculations
+        df_history['MarketCap'] = info.get('marketCap', np.nan)
         
-        # Merge S&P 500 (included in output, before TSMN calculation)
+        # Merge S&P 500
         df_history = df_history.merge(sp500, on='Date', how='left').ffill().infer_objects(copy=False)
         
-        # Technical indicators (use 'Close' for stock price, keeping 20-day and 5-day RSIs and TSMN)
+        # Technical indicators
         delta = df_history['Close'].diff()
-        # 5-day RSI for short-term analysis
-        gain_5 = (delta.where(delta > 0, 0)).rolling(window=5).mean()
-        loss_5 = (-delta.where(delta < 0, 0)).rolling(window=5).mean()
-        rs_5 = gain_5 / loss_5.replace(0, np.nan)
-        df_history['RSI_5'] = 100 - (100 / (1 + rs_5)).fillna(50)  # Fill NaN with 50 (neutral RSI) for initial periods
-        # 20-day RSI for longer-term context within short-term focus
-        gain_20 = (delta.where(delta > 0, 0)).rolling(window=20).mean()
-        loss_20 = (-delta.where(delta < 0, 0)).rolling(window=20).mean()
-        rs_20 = gain_20 / loss_20.replace(0, np.nan)
-        df_history['RSI_20'] = 100 - (100 / (1 + rs_20)).fillna(50)  # Fill NaN with 50 (neutral RSI) for initial periods
         
-        # Custom Indicator: Temporal-Spectral Momentum Nexus (TSMN)
-        # Temporal Momentum Gradient
+        # Multiple RSI indicators
+        def calculate_rsi(data, periods=[5, 10, 20, 30, 60]):
+            rsi_values = {}
+            for period in periods:
+                gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+                rs = gain / loss.replace(0, 1e-10)
+                rsi = 100 - (100 / (1 + rs))
+                rsi_values[f'RSI_{period}'] = rsi.fillna(50)
+            return pd.DataFrame(rsi_values)
+        
+        rsi_df = calculate_rsi(df_history)
+        df_history = pd.concat([df_history, rsi_df], axis=1)
+        
+        # Price derivatives and daily price change
+        df_history['Close_Diff_1'] = df_history['Close'].diff().fillna(0)
+        df_history['Price_Change'] = df_history['Close'].diff().fillna(0)  # Daily price change
+        df_history['Close_Diff_2'] = df_history['Close_Diff_1'].diff().fillna(0)
+        
+        # Volatility
+        df_history['Close_Volatility'] = df_history['Close'].rolling(window=5).std().fillna(df_history['Close'].std())
+        
+        # Enhanced TSMN with spectral analysis
         momentum_gradient = df_history['RSI_5'] - df_history['RSI_20']
         temp_gradient = momentum_gradient.diff(periods=5).fillna(0)
         temp_gradient_smoothed = temp_gradient.rolling(window=3).mean().fillna(0)
         
-        # Spectral Oscillations (simplified to return scalar using sum of cosine-weighted differences)
         close_diff = df_history['Close'].diff().fillna(0)
         vol_diff = df_history['Volume'].diff().fillna(0)
-        spectral_close = close_diff.rolling(window=5).apply(lambda x: np.sum(x ** 2 * np.cos(2 * np.pi * 2 / 5))).fillna(0)  # Use fixed frequency for scalar output
-        spectral_vol = vol_diff.rolling(window=5).apply(lambda x: np.sum(x ** 2 * np.cos(2 * np.pi * 2 / 5))).fillna(0)  # Use fixed frequency for scalar output
-        spectral_energy = (spectral_close + spectral_vol) / (spectral_close.rolling(window=5).sum().replace(0, 1) + spectral_vol.rolling(window=5).sum().replace(0, 1))
+        from scipy.fft import fft
+        spectral_close = np.abs(fft(close_diff.rolling(window=5).mean().fillna(0)))[:3].mean()
+        spectral_vol = np.abs(fft(vol_diff.rolling(window=5).mean().fillna(0)))[:3].mean()
+        spectral_energy = (spectral_close + spectral_vol) / 2
         
-        # Stochastic Market Adjustment
         vol_weight = df_history['Volume'] / df_history['Volume'].rolling(window=5).sum().replace(0, 1)
         market_cap_weight = np.log(1 + df_history['MarketCap'] / df_history['MarketCap'].rolling(window=5).sum().replace(0, 1))
         weighted_spectral = spectral_energy * vol_weight * market_cap_weight
@@ -116,12 +131,14 @@ def fetch_technical_data_to_csv(symbols, start_date="2020-01-01", end_date=None,
         sp500_mean = df_history['SP500'].rolling(window=5).mean().fillna(df_history['SP500'].mean())
         sp500_std = df_history['SP500'].rolling(window=5).std().replace(0, 1).fillna(1)
         sp500_zscore = (df_history['SP500'] - sp500_mean) / sp500_std
-        sp500_zscore = np.clip(sp500_zscore, -3, 3)  # Cap at ±3 for stability
+        sp500_zscore = np.clip(sp500_zscore, -3, 3)
         market_stability = np.exp(-np.abs(sp500_zscore) / 3)
         
-        # TSMN Formula (ensure scalar output)
-        tsmn = temp_gradient_smoothed * weighted_spectral * market_stability
-        df_history['TSMN'] = tsmn.rolling(window=5).mean().fillna(0)  # 5-day EMA for short-term focus
+        df_history['TSMN_Spectral'] = temp_gradient_smoothed * weighted_spectral * market_stability
+        df_history['TSMN'] = df_history['TSMN_Spectral'].rolling(window=5).mean().fillna(0)
+        
+        # Market sentiment
+        df_history['Market_Sentiment'] = (df_history['SP500'].pct_change().fillna(0) + np.log(df_history['Volume'] + 1).diff().fillna(0)) / 2
         
         # Trim to requested start_date
         df_history = df_history[df_history['Date'] >= start_date]
@@ -139,13 +156,26 @@ def fetch_technical_data_to_csv(symbols, start_date="2020-01-01", end_date=None,
     
     return all_data
 
+def create_sample_symbols_csv(output_file="./stock_data/stock_symbols.csv"):
+    """Create a sample CSV with 10 stock symbols if it doesn't exist."""
+    symbols = ['AAPL', 'MSFT', 'GOOG', 'AMZN', 'TSLA', 'META', 'NVDA', 'PYPL', 'INTC', 'AMD']
+    if not os.path.exists(output_file):
+        pd.DataFrame({'Symbol': symbols}).to_csv(output_file, index=False)
+        print(f"Created sample symbols file at {output_file}")
+    else:
+        print(f"Symbols file already exists at {output_file}")
+
 def main():
-    symbols = ['AAPL', 'MSFT', 'GOOG']
     start_date = "2020-01-01"
     output_dir = "./stock_data"
+    symbols_file = os.path.join(output_dir, "stock_symbols.csv")
     output_file = os.path.join(output_dir, "stock_data_technical.csv")
     
-    data = fetch_technical_data_to_csv(symbols, start_date=start_date, output_file=output_file)
+    # Create sample symbols CSV if it doesn't exist
+    create_sample_symbols_csv(symbols_file)
+    
+    # Fetch data using symbols from CSV
+    data = fetch_technical_data_to_csv(symbols_file, start_date=start_date, output_file=output_file)
 
 if __name__ == "__main__":
     main()
