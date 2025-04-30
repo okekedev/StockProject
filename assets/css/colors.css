@@ -1,0 +1,44 @@
+/**
+ * 1940s Bank Theme - Color Palette
+ * 
+ * This file defines the color variables used throughout the application
+ * to create a cohesive 1940s bank aesthetic.
+ */
+
+ :root {
+    /* Primary Colors */
+    --bank-green: #1b4232;         /* Deep forest green - primary brand color */
+    --bank-green-light: #2d6a50;   /* Lighter green for hover states */
+    --bank-green-dark: #0d2219;    /* Darker green for active states */
+    
+    /* Secondary Colors */
+    --bank-gold: #bf9b30;          /* Gold accent for important elements */
+    --bank-gold-light: #d4b255;    /* Lighter gold for hover states */
+    --bank-gold-dark: #96792a;     /* Darker gold for active states */
+    
+    /* Tertiary Colors */
+    --bank-brown: #5d4a38;         /* Wood-inspired brown for traditional elements */
+    --bank-cream: #f5f0e6;         /* Cream color for backgrounds and cards */
+    --bank-parchment: #f0e8d9;     /* Parchment color for document backgrounds */
+    
+    /* Text Colors */
+    --bank-text-dark: #333333;     /* Primary text color */
+    --bank-text-medium: #555555;   /* Secondary text color */
+    --bank-text-light: #f8f5f0;    /* Light text color for dark backgrounds */
+    
+    /* UI Colors */
+    --bank-border: #d0c8b0;        /* Border color for UI elements */
+    --bank-shadow: rgba(0, 0, 0, 0.15); /* Shadow color */
+    --bank-highlight: #fffbeb;     /* Highlight color for focus states */
+    
+    /* State Colors */
+    --bank-success: #2d6a50;       /* Success green */
+    --bank-warning: #c17f17;       /* Warning amber */
+    --bank-error: #913a3a;         /* Error red */
+    --bank-info: #304e67;          /* Info blue */
+    
+    /* Gradients */
+    --bank-gradient-green: linear-gradient(to bottom, var(--bank-green-light), var(--bank-green));
+    --bank-gradient-gold: linear-gradient(to bottom, var(--bank-gold-light), var(--bank-gold));
+    --bank-gradient-cream: linear-gradient(to bottom, #ffffff, var(--bank-cream));
+}

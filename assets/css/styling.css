@@ -1,0 +1,343 @@
+/**
+ * 1940s Bank Theme - Styling
+ * 
+ * This file contains styling for all components in the application,
+ * creating a cohesive 1940s bank aesthetic.
+ */
+
+/* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Roboto+Slab:wght@400;500;700&display=swap');
+
+/* Base styling */
+body {
+    font-family: 'Libre Baskerville', serif;
+    background-color: var(--bank-cream);
+    color: var(--bank-text-dark);
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Roboto Slab', serif;
+    margin-bottom: 1rem;
+    color: var(--bank-green);
+}
+
+h1 {
+    border-bottom: 3px double var(--bank-border);
+    padding-bottom: 0.5rem;
+    font-size: 2.2rem;
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+/* Layout Components */
+.bank-section {
+    background-color: var(--bank-parchment);
+    border: 1px solid var(--bank-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 8px var(--bank-shadow);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.bank-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: var(--bank-gradient-green);
+}
+
+.bank-section-title {
+    color: var(--bank-green);
+    border-bottom: 2px solid var(--bank-gold);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    letter-spacing: 0.05em;
+}
+
+.bank-info-panel {
+    background-color: var(--bank-cream);
+    border: 1px solid var(--bank-border);
+    border-left: 5px solid var(--bank-gold);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border-radius: 0 4px 4px 0;
+}
+
+/* Form Elements */
+.bank-form {
+    padding: 1.5rem;
+    background-color: white;
+    border: 1px solid var(--bank-border);
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+    box-shadow: inset 0 2px 4px var(--bank-shadow);
+}
+
+.bank-form-row {
+    margin-bottom: 1.2rem !important;
+}
+
+.bank-label {
+    font-weight: 700;
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--bank-text-medium);
+}
+
+.bank-input, 
+.bank-form .dash-dropdown {
+    border: 1px solid var(--bank-border) !important;
+    border-radius: 4px;
+    padding: 0.6rem 0.8rem;
+    background-color: var(--bank-highlight);
+    box-shadow: inset 0 1px 3px var(--bank-shadow);
+    transition: border-color 0.3s, box-shadow 0.3s;
+    width: 100%;
+}
+
+.bank-input:focus, 
+.bank-form .dash-dropdown:focus-within {
+    border-color: var(--bank-gold) !important;
+    box-shadow: inset 0 1px 3px var(--bank-shadow), 0 0 5px rgba(191, 155, 48, 0.3);
+    outline: none;
+}
+
+/* Buttons */
+.bank-button {
+    background: var(--bank-gradient-green);
+    color: var(--bank-text-light);
+    border: 1px solid var(--bank-green-dark);
+    padding: 0.75rem 1.5rem;
+    font-family: 'Roboto Slab', serif;
+    font-weight: 700;
+    font-size: 1rem;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px var(--bank-shadow);
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.bank-button:hover {
+    background: var(--bank-green-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px var(--bank-shadow);
+}
+
+.bank-button:active {
+    background: var(--bank-green-dark);
+    transform: translateY(1px);
+    box-shadow: 0 1px 2px var(--bank-shadow);
+}
+
+/* Radio buttons */
+.bank-radio {
+    margin-bottom: 1.5rem;
+}
+
+.bank-radio .dash-radio-items {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.bank-radio label {
+    font-weight: 600;
+    color: var(--bank-text-medium);
+    padding-left: 0.5rem;
+}
+
+/* Status messages */
+.bank-notification {
+    padding: 1rem;
+    border-radius: 4px;
+    margin-top: 1.5rem;
+    border-left: 5px solid;
+}
+
+.bank-success-notification {
+    background-color: rgba(45, 106, 80, 0.1);
+    border-left-color: var(--bank-success);
+}
+
+.bank-error-notification {
+    background-color: rgba(145, 58, 58, 0.1);
+    border-left-color: var(--bank-error);
+}
+
+.bank-text {
+    font-size: 1rem;
+    line-height: 1.6;
+    margin-bottom: 0.75rem;
+}
+
+.bank-success {
+    color: var(--bank-success);
+    font-weight: 700;
+}
+
+.bank-error {
+    color: var(--bank-error);
+    font-weight: 700;
+}
+
+.bank-code {
+    font-family: monospace;
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 1rem;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.9rem;
+}
+
+/* Tabs styling - UPDATED */
+.dash-tabs {
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--bank-border);
+    background-color: var(--bank-parchment);
+}
+
+.dash-tab {
+    padding: 1rem 1.5rem;
+    font-family: 'Roboto Slab', serif;
+    font-weight: 500;
+    color: var(--bank-text-medium);
+    border: 1px solid var(--bank-border);
+    background-color: var(--bank-cream);
+    border-bottom: none;
+    margin-right: 0.5rem;
+    border-radius: 8px 8px 0 0;
+    transition: all 0.3s;
+}
+
+/* UPDATED SELECTED TAB STYLING */
+.dash-tab--selected {
+    background-color: var(--bank-gold-light);
+    color: var(--bank-green-dark);
+    font-weight: 700;
+    border-top: 3px solid var(--bank-gold);
+    border-left: 1px solid var(--bank-gold);
+    border-right: 1px solid var(--bank-gold);
+    box-shadow: 0 -2px 5px var(--bank-shadow);
+    position: relative;
+    z-index: 2;
+}
+
+/* Add new hover effect for tabs */
+.dash-tab:hover:not(.dash-tab--selected) {
+    background-color: var(--bank-gold-light);
+    color: var(--bank-green);
+    border-color: var(--bank-gold);
+    transform: translateY(-2px);
+}
+
+/* Dropdowns */
+.dash-dropdown .Select-control {
+    border: 1px solid var(--bank-border);
+    border-radius: 4px;
+    background-color: var(--bank-highlight);
+}
+
+.dash-dropdown .Select-control:hover {
+    border-color: var(--bank-gold);
+    box-shadow: 0 0 5px rgba(191, 155, 48, 0.3);
+}
+
+.dash-dropdown .Select-menu-outer {
+    border: 1px solid var(--bank-border);
+    box-shadow: 0 4px 8px var(--bank-shadow);
+    border-radius: 0 0 4px 4px;
+}
+
+.dash-dropdown .Select-option.is-focused {
+    background-color: var(--bank-cream);
+}
+
+.dash-dropdown .Select-option.is-selected {
+    background-color: var(--bank-gold-light);
+    color: var(--bank-green-dark);
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5rem;
+    background-color: white;
+    border: 1px solid var(--bank-border);
+    box-shadow: 0 2px 4px var(--bank-shadow);
+}
+
+th {
+    background-color: var(--bank-green);
+    color: var(--bank-text-light);
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 700;
+}
+
+td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--bank-border);
+}
+
+tr:nth-child(even) {
+    background-color: var(--bank-parchment);
+}
+
+tr:hover {
+    background-color: var(--bank-highlight);
+}
+
+/* Main Container */
+.bank-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Header */
+.bank-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 2rem 0;
+    border-bottom: 3px double var(--bank-border);
+    background-color: white;
+    box-shadow: 0 2px 10px var(--bank-shadow);
+}
+
+.bank-logo {
+    color: var(--bank-green);
+    font-family: 'Roboto Slab', serif;
+    font-weight: 700;
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.1em;
+}
+
+.bank-tagline {
+    color: var(--bank-gold);
+    font-style: italic;
+    font-size: 1.2rem;
+}
+
+/* Footer */
+.bank-footer {
+    text-align: center;
+    margin-top: 3rem;
+    padding: 1.5rem 0;
+    border-top: 3px double var(--bank-border);
+    color: var(--bank-text-medium);
+    font-size: 0.9rem;
+}

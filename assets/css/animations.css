@@ -1,0 +1,203 @@
+/**
+ * 1940s Bank Theme - Animations
+ * 
+ * This file contains animations used throughout the application to create
+ * a feeling of classic elegance with subtle movements reminiscent of 
+ * mechanical typewriters and adding machines from the 1940s era.
+ */
+
+/* Typewriter text animation */
+@keyframes typewriter {
+    from { width: 0; }
+    to { width: 100%; }
+}
+
+@keyframes blink-caret {
+    from, to { border-color: transparent; }
+    50% { border-color: var(--bank-gold); }
+}
+
+.typewriter-text {
+    overflow: hidden;
+    white-space: nowrap;
+    margin: 0 auto;
+    border-right: 3px solid var(--bank-gold);
+    animation: 
+        typewriter 3.5s steps(40, end),
+        blink-caret 0.75s step-end infinite;
+}
+
+/* Subtle paper slide-in animation */
+@keyframes slide-in {
+    0% {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.slide-in {
+    animation: slide-in 0.4s ease-out forwards;
+}
+
+/* Tab selection animation */
+@keyframes tab-select {
+    0% { transform: translateY(3px); }
+    100% { transform: translateY(0); }
+}
+
+.tab-selected {
+    animation: tab-select 0.3s ease-out forwards;
+}
+
+/* Button click feedback */
+@keyframes button-press {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.95); }
+    100% { transform: scale(1); }
+}
+
+.button-press {
+    animation: button-press 0.2s ease-out;
+}
+
+/* Fade in for notifications */
+@keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+.fade-in {
+    animation: fade-in 0.5s ease-out forwards;
+}
+
+/* Paper rustle effect for form elements on focus */
+@keyframes paper-rustle {
+    0% { transform: rotate(0deg); }
+    25% { transform: rotate(0.5deg); }
+    75% { transform: rotate(-0.5deg); }
+    100% { transform: rotate(0deg); }
+}
+
+.input-focus:focus {
+    animation: paper-rustle 0.3s ease-in-out;
+}
+
+/* Adding machine calculation effect */
+@keyframes calculate {
+    0% { 
+        transform: translateY(0);
+        opacity: 1;
+    }
+    20% {
+        transform: translateY(-5px);
+        opacity: 0.8;
+    }
+    40% {
+        transform: translateY(-10px);
+        opacity: 0.6;
+    }
+    60% {
+        transform: translateY(-15px);
+        opacity: 0.4;
+    }
+    80% {
+        transform: translateY(-20px);
+        opacity: 0.2;
+    }
+    100% {
+        transform: translateY(-25px);
+        opacity: 0;
+    }
+}
+
+.calculate {
+    position: relative;
+}
+
+.calculate::after {
+    content: attr(data-value);
+    position: absolute;
+    top: 0;
+    left: 0;
+    animation: calculate 1s forwards;
+}
+
+/* Ink stamp effect */
+@keyframes stamp {
+    0% {
+        transform: rotate(-5deg) scale(1.5);
+        opacity: 0;
+    }
+    50% {
+        transform: rotate(0deg) scale(1.2);
+        opacity: 0.6;
+    }
+    100% {
+        transform: rotate(0deg) scale(1);
+        opacity: 1;
+    }
+}
+
+.stamp {
+    animation: stamp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Drawer opening effect */
+@keyframes drawer-open {
+    0% {
+        max-height: 0;
+        opacity: 0;
+    }
+    100% {
+        max-height: 1000px;
+        opacity: 1;
+    }
+}
+
+.drawer-open {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    animation: drawer-open 0.5s ease-out forwards;
+}
+
+/* Ticker tape loading indicator */
+@keyframes ticker-tape {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+.ticker-tape-container {
+    width: 100%;
+    overflow: hidden;
+    background-color: var(--bank-parchment);
+    border: 1px solid var(--bank-border);
+    padding: 5px 0;
+}
+
+.ticker-tape {
+    white-space: nowrap;
+    animation: ticker-tape 20s linear infinite;
+    display: inline-block;
+}
+
+.ticker-tape span {
+    display: inline-block;
+    padding: 0 20px;
+    font-family: monospace;
+}
+
+/* Subtle page background texture animation */
+@keyframes texture-shift {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 2% 2%; }
+}
+
+.texture-bg {
+    background-image: url('data:image/png;base64,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');
+    animation: texture-shift 10s ease-in-out infinite alternate;
+}

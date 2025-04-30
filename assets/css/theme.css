@@ -1,0 +1,367 @@
+/**
+ * 1940s Bank Theme - Main Theme File
+ * 
+ * This is the main theme file that imports all component stylesheets
+ * and provides additional theme-specific styling.
+ */
+
+/* Import component stylesheets */
+@import 'colors.css';
+@import 'styling.css';
+@import 'animations.css';
+@import 'research.css'; /* Added research department styling */
+
+/* 
+ * 1940s Bank Theme Custom Elements
+ */
+
+/* Vintage Paper Texture Background */
+.bank-app {
+    min-height: 100vh;
+    background-color: var(--bank-cream);
+    background-image: url('data:image/png;base64,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');
+    padding: 20px;
+}
+
+/* Bank Header with Emblem */
+.bank-header {
+    position: relative;
+    background-color: var(--bank-cream);
+    padding: 30px 20px;
+    text-align: center;
+    margin-bottom: 30px;
+    border-bottom: 3px double var(--bank-border);
+    box-shadow: 0 4px 8px var(--bank-shadow);
+}
+
+.bank-header::before {
+    content: "";
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 60px;
+    background-color: var(--bank-gold);
+    border-radius: 50%;
+    z-index: 0;
+    opacity: 0.2;
+}
+
+.bank-emblem {
+    position: relative;
+    display: inline-block;
+    width: 80px;
+    height: 80px;
+    margin-bottom: 15px;
+    background-color: var(--bank-green);
+    border: 3px solid var(--bank-gold);
+    border-radius: 50%;
+    box-shadow: 0 4px 8px var(--bank-shadow);
+}
+
+.bank-emblem::before {
+    content: "$";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Libre Baskerville', serif;
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--bank-gold);
+}
+
+.bank-title {
+    font-family: 'Roboto Slab', serif;
+    font-size: 2.5rem;
+    color: var(--bank-green);
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+}
+
+.bank-subtitle {
+    font-family: 'Libre Baskerville', serif;
+    font-style: italic;
+    color: var(--bank-gold);
+    margin-top: 5px;
+}
+
+/* UPDATED: Tab Navigation with Vintage Look */
+.bank-tabs {
+    display: flex;
+    overflow-x: auto;
+    background-color: var(--bank-parchment);
+    border: 1px solid var(--bank-border);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 -2px 5px var(--bank-shadow);
+    margin-bottom: 0;
+}
+
+.bank-tab {
+    padding: 15px 25px;
+    background-color: var(--bank-cream);
+    border-right: 1px solid var(--bank-border);
+    font-family: 'Roboto Slab', serif;
+    color: var(--bank-text-medium);
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.bank-tab:hover {
+    background-color: var(--bank-parchment);
+}
+
+/* UPDATED: Active tab styling to match gold theme */
+.bank-tab.active {
+    background-color: var(--bank-gold-light);
+    color: var(--bank-green-dark);
+    font-weight: 600;
+    border-bottom: none;
+    box-shadow: inset 0 4px 0 var(--bank-gold);
+}
+
+.bank-tab:first-child {
+    border-top-left-radius: 8px;
+}
+
+.bank-tab:last-child {
+    border-top-right-radius: 8px;
+    border-right: none;
+}
+
+/* Card with "Paper" Appearance */
+.bank-card {
+    background-color: white;
+    border: 1px solid var(--bank-border);
+    border-radius: 5px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 8px var(--bank-shadow);
+    position: relative;
+}
+
+.bank-card-header {
+    border-bottom: 2px solid var(--bank-gold);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.bank-card-title {
+    color: var(--bank-green);
+    font-family: 'Roboto Slab', serif;
+    font-size: 1.5rem;
+    margin: 0;
+}
+
+/* Vintage Form Field */
+.bank-form-group {
+    margin-bottom: 20px;
+}
+
+.bank-form-control {
+    display: block;
+    width: 100%;
+    padding: 10px 15px;
+    font-family: 'Libre Baskerville', serif;
+    color: var(--bank-text-dark);
+    background-color: var(--bank-highlight);
+    border: 1px solid var(--bank-border);
+    box-shadow: inset 0 1px 3px var(--bank-shadow);
+    border-radius: 4px;
+    transition: border-color 0.3s;
+}
+
+.bank-form-control:focus {
+    border-color: var(--bank-gold);
+    box-shadow: inset 0 1px 3px var(--bank-shadow), 0 0 5px rgba(191, 155, 48, 0.3);
+    outline: none;
+}
+
+/* Ledger-Style Table */
+.bank-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 30px;
+    background-color: white;
+    box-shadow: 0 4px 8px var(--bank-shadow);
+}
+
+.bank-table th {
+    background-color: var(--bank-green);
+    color: var(--bank-text-light);
+    text-align: left;
+    padding: 12px 15px;
+    font-family: 'Roboto Slab', serif;
+    font-weight: 600;
+    border: 1px solid var(--bank-green-dark);
+}
+
+.bank-table td {
+    padding: 10px 15px;
+    border: 1px solid var(--bank-border);
+    color: var(--bank-text-dark);
+}
+
+.bank-table tr:nth-child(even) {
+    background-color: var(--bank-parchment);
+}
+
+.bank-table tr:hover {
+    background-color: var(--bank-highlight);
+}
+
+/* Vintage Badge */
+.bank-badge {
+    display: inline-block;
+    padding: 5px 10px;
+    font-family: 'Roboto Slab', serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--bank-text-light);
+    background-color: var(--bank-green);
+    border-radius: 3px;
+    margin-right: 5px;
+}
+
+.bank-badge-success {
+    background-color: var(--bank-success);
+}
+
+.bank-badge-warning {
+    background-color: var(--bank-warning);
+}
+
+.bank-badge-error {
+    background-color: var(--bank-error);
+}
+
+/* Loading Indicator with Spinning Mechanism */
+.bank-loading {
+    display: inline-block;
+    position: relative;
+    width: 50px;
+    height: 50px;
+    border: 3px solid var(--bank-border);
+    border-radius: 50%;
+    border-top-color: var(--bank-gold);
+    animation: bank-spin 1.5s linear infinite;
+}
+
+@keyframes bank-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Footer with Vintage Decoration */
+.bank-footer {
+    text-align: center;
+    margin-top: 40px;
+    padding: 20px;
+    background-color: var(--bank-parchment);
+    border-top: 3px double var(--bank-border);
+    color: var(--bank-text-medium);
+    font-size: 0.9rem;
+    box-shadow: 0 -2px 5px var(--bank-shadow);
+    position: relative;
+}
+
+.bank-footer::after {
+    content: "";
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    height: 1px;
+    background: var(--bank-gold);
+}
+
+/* Special Stamp Effects for Documents */
+.confidential-stamp {
+    display: inline-block;
+    padding: 8px 15px;
+    background-color: rgba(145, 58, 58, 0.8);
+    color: white;
+    font-family: 'Roboto Slab', serif;
+    font-weight: 700;
+    font-size: 1rem;
+    transform: rotate(-15deg);
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    border: 2px solid darkred;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    opacity: 0.9;
+    animation: stamp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Forecast Document Styling */
+.forecast-document {
+    background-color: var(--bank-parchment);
+    border: 1px solid var(--bank-border);
+    padding: 30px;
+    position: relative;
+    margin-top: 20px;
+    box-shadow: 0 4px 10px var(--bank-shadow);
+}
+
+.bank-forecast-title {
+    font-family: 'Roboto Slab', serif;
+    font-size: 1.5rem;
+    color: var(--bank-green);
+    text-align: center;
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+}
+
+.bank-forecast-date {
+    font-family: 'Libre Baskerville', serif;
+    font-style: italic;
+    color: var(--bank-gold);
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .bank-tabs {
+        flex-direction: column;
+        border-radius: 8px;
+    }
+    
+    .bank-tab {
+        border-right: none;
+        border-bottom: 1px solid var(--bank-border);
+    }
+    
+    .bank-tab:first-child {
+        border-top-right-radius: 8px;
+    }
+    
+    .bank-tab:last-child {
+        border-radius: 0 0 8px 8px;
+    }
+    
+    .bank-title {
+        font-size: 1.8rem;
+    }
+}
+
+/* UPDATED: Dash Tabs styling to match the bank theme */
+.dash-tabs .dash-tab--selected {
+    background-color: var(--bank-gold-light);
+    color: var(--bank-green-dark);
+    border-top: 3px solid var(--bank-gold);
+    border-bottom: none;
+}
+
+.dash-tabs .dash-tab:hover:not(.dash-tab--selected) {
+    background-color: var(--bank-gold-light);
+    color: var(--bank-green);
+    opacity: 0.8;
+}

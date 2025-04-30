@@ -1,0 +1,23 @@
+{
+  "AAPL": {
+    "symbol": "AAPL",
+    "sentiment": "unknown",
+    "sentiment_reasoning": "Gemini API not available",
+    "impact_summary": "Unable to analyze sentiment due to API configuration issues.",
+    "fetch_time_seconds": 1.17
+  },
+  "MSFT": {
+    "symbol": "MSFT",
+    "sentiment": "unknown",
+    "sentiment_reasoning": "Gemini API not available",
+    "impact_summary": "Unable to analyze sentiment due to API configuration issues.",
+    "fetch_time_seconds": 0.77
+  },
+  "GOOGL": {
+    "symbol": "GOOGL",
+    "sentiment": "unknown",
+    "sentiment_reasoning": "Gemini API not available",
+    "impact_summary": "Unable to analyze sentiment due to API configuration issues.",
+    "fetch_time_seconds": 0.54
+  }
+}
