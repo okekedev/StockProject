@@ -1,5 +1,5 @@
 """
-Updated Research Department that uses yfinance for stock news.
+Updated Research Department that uses News API for stock news.
 """
 from dash import html, dcc, callback, Output, Input, State
 import dash_bootstrap_components as dbc
@@ -144,10 +144,16 @@ def generate_research_report(n_clicks, selected_stocks, tab):
     # Create a vintage-style research report
     report_sections = []
     
-    # Process each selected stock
+    # Check if API keys are set
+    if 'NEWS_API_KEY' not in os.environ:
+        os.environ['NEWS_API_KEY'] = config.NEWS_API_KEY
+    if 'GEMINI_API_KEY' not in os.environ:
+        os.environ['GEMINI_API_KEY'] = config.GEMINI_API_KEY
+    
+    # Process each selected stock - use past 3 days of news
     for i, symbol in enumerate(selected_stocks):
-        # Get stock analysis using yahoo finance
-        news_data = get_stock_analysis(symbol)
+        # Get stock analysis using News API and Gemini
+        news_data = get_stock_analysis(symbol, days_lookback=3)
         
         # Create a report section for this stock
         section = html.Div([

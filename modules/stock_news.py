@@ -1,27 +1,34 @@
 """
-Stock news and sentiment analysis module using yfinance and Gemini API.
+Stock news and sentiment analysis module using News API and Gemini API.
 """
 import os
 import json
 import yfinance as yf
+import requests
 from datetime import datetime, timedelta
 import google.generativeai as genai
 import pandas as pd
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure Gemini API
 def configure_gemini():
     """Configure the Gemini API with the API key."""
     api_key = os.environ.get('GEMINI_API_KEY')
     if not api_key:
-        print("Warning: GEMINI_API_KEY not found in environment variables!")
-        return False
+        # Set the API key directly for testing
+        api_key = "AIzaSyCrr6OzYwYvuiorPvmAAkYwb0lHQI8U7Wo"
+        os.environ['GEMINI_API_KEY'] = api_key
+        print("Using hardcoded API key for testing")
         
     genai.configure(api_key=api_key)
-    return True
+    return True if api_key else False
 
-def get_stock_news(symbol, days_lookback=7):
+def get_stock_news(symbol, days_lookback=3):
     """
-    Get recent news for a stock using yfinance.
+    Get recent news for a stock using News API.
     
     Args:
         symbol (str): Stock symbol
@@ -31,38 +38,44 @@ def get_stock_news(symbol, days_lookback=7):
         list: List of news items with date, headline, and link
     """
     try:
-        # Create a Ticker object
+        # Get News API key from environment or use default
+        news_api_key = os.environ.get('NEWS_API_KEY', '9b73205028734f2181dcda4f1b892d66')
+
+        # Get company info from yfinance
         ticker = yf.Ticker(symbol)
-        
-        # Get news items
-        news_items = []
-        
-        # Get news data from yfinance
-        news = ticker.news
-        
-        # Calculate the cutoff date
-        cutoff_date = datetime.now() - timedelta(days=days_lookback)
-        
-        # Process news items
-        if news:
-            for item in news:
-                # Convert timestamp to datetime
-                news_date = datetime.fromtimestamp(item.get('providerPublishTime', 0))
-                
-                # Only include news from the specified lookback period
-                if news_date >= cutoff_date:
-                    news_items.append({
-                        'date': news_date.strftime('%Y-%m-%d'),
-                        'headline': item.get('title', 'No headline available'),
-                        'summary': item.get('summary', 'No summary available')[:100] + '...',
-                        'url': item.get('link', '#')
-                    })
-        
-        # Get company information for context
         info = ticker.info
         company_name = info.get('longName', symbol)
         sector = info.get('sector', 'Unknown')
         industry = info.get('industry', 'Unknown')
+        
+        # Calculate date for query (NewsAPI uses format: 2025-04-30)
+        from_date = (datetime.now() - timedelta(days=days_lookback)).strftime('%Y-%m-%d')
+        
+        # Construct URL - added sortBy=publishedAt to get newest articles first
+        url = f"https://newsapi.org/v2/everything?q={company_name}&from={from_date}&sortBy=publishedAt&apiKey={news_api_key}"
+        
+        print(f"Fetching news for {company_name} from {from_date} using News API")
+        
+        # Make request
+        response = requests.get(url)
+        news_data = response.json()
+        
+        news_items = []
+        if news_data.get('status') == 'ok' and 'articles' in news_data:
+            articles = news_data['articles']
+            print(f"Found {len(articles)} news articles using News API (using top 10 most recent)")
+            
+            for article in articles[:10]:  # Limit to 10 most recent articles
+                news_date = datetime.strptime(article.get('publishedAt', ''), '%Y-%m-%dT%H:%M:%SZ')
+                
+                news_items.append({
+                    'date': news_date.strftime('%Y-%m-%d'),
+                    'headline': article.get('title', 'No headline available'),
+                    'summary': article.get('description', 'No summary available')[:100] + '...' if article.get('description') else 'No summary available',
+                    'url': article.get('url', '#')
+                })
+        else:
+            print(f"Error or no articles from News API: {news_data.get('message', 'Unknown error')}")
         
         # Get recent stock price movement
         hist = ticker.history(period='1mo')
@@ -72,13 +85,14 @@ def get_stock_news(symbol, days_lookback=7):
             price_change_pct = ((current_price - month_ago_price) / month_ago_price) * 100
         else:
             price_change_pct = 0
+            current_price = 0
             
         context = {
             'company_name': company_name,
             'sector': sector,
             'industry': industry,
             'price_change_pct': round(price_change_pct, 2),
-            'current_price': round(current_price, 2) if 'current_price' in locals() else 'Unknown'
+            'current_price': round(current_price, 2) if current_price != 0 else 'Unknown'
         }
         
         return news_items, context
@@ -104,7 +118,8 @@ def analyze_sentiment(news_items, context, symbol):
             'symbol': symbol,
             'sentiment': 'unknown',
             'sentiment_reasoning': 'Gemini API not available',
-            'impact_summary': 'Unable to analyze sentiment due to API configuration issues.'
+            'impact_summary': 'Unable to analyze sentiment due to API configuration issues.',
+            'news_items': news_items
         }
     
     # If no news items found
@@ -112,8 +127,9 @@ def analyze_sentiment(news_items, context, symbol):
         return {
             'symbol': symbol,
             'sentiment': 'neutral',
-            'sentiment_reasoning': 'No recent news found for analysis',
-            'impact_summary': 'Without recent news, sentiment analysis is inconclusive. Consider technical indicators instead.'
+            'sentiment_reasoning': f'No recent news found for {context["company_name"]} ({symbol})',
+            'impact_summary': 'Without recent news, sentiment analysis is inconclusive. Consider technical indicators instead.',
+            'news_items': news_items
         }
     
     try:
@@ -186,18 +202,19 @@ def analyze_sentiment(news_items, context, symbol):
             'news_items': news_items
         }
 
-def get_stock_analysis(symbol):
+def get_stock_analysis(symbol, days_lookback=3):
     """
     Main function to get stock news and analyze sentiment.
     
     Args:
         symbol (str): Stock symbol
+        days_lookback (int): Number of days to look back for news
         
     Returns:
         dict: Analysis results including news and sentiment
     """
     # Get news and context
-    news_items, context = get_stock_news(symbol)
+    news_items, context = get_stock_news(symbol, days_lookback=days_lookback)
     
     # Analyze sentiment
     result = analyze_sentiment(news_items, context, symbol)

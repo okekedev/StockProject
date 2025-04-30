@@ -1,5 +1,5 @@
 """
-Test script for the Research Department using yfinance.
+Test script for the Research Department using News API and Gemini.
 
 This script tests the stock_news module by fetching news and analyzing
 sentiment for sample stocks.
@@ -8,11 +8,19 @@ import os
 import json
 import time
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Ensure the Gemini API key is set
 if 'GEMINI_API_KEY' not in os.environ:
-    print("Warning: GEMINI_API_KEY not found in environment variables.")
-    print("Please set it with: export GEMINI_API_KEY=your-key-here")
+    os.environ['GEMINI_API_KEY'] = "AIzaSyCrr6OzYwYvuiorPvmAAkYwb0lHQI8U7Wo"
+    print("Setting GEMINI_API_KEY directly for testing")
+
+# Ensure the News API key is set
+os.environ['NEWS_API_KEY'] = "9b73205028734f2181dcda4f1b892d66"
+print("News API Key set for testing")
 
 try:
     # Import the stock news module
@@ -56,7 +64,7 @@ def test_stock_news():
         print(f"  - Sentiment: {sentiment}")
         print(f"  - Analysis took {result['fetch_time_seconds']}s")
         
-        # Respect Yahoo Finance API rate limits
+        # Respect API rate limits
         if i < len(test_stocks) - 1:
             print("  - Waiting 2 seconds to respect rate limits...")
             time.sleep(2)
