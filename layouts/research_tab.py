@@ -17,34 +17,34 @@ def get_layout():
     """Generate layout for the Research Department."""
     return html.Div([
         html.Div([
-            html.H4("Intelligence Research Department", className="bankSectionTitle")
-        ], className="bankCardHeader"),
+            html.H4("Intelligence Research Department", className="bank-section-title")
+        ], className="bank-card-header"),
         
         html.Div([
             html.Div([
-                html.Div(className="bankEmblem", style={"float": "right", "width": "40px", "height": "40px"}),
-                html.H5("MARKET INTELLIGENCE BULLETIN", className="bankForecastTitle"),
+                html.Div(className="bank-emblem", style={"float": "right", "width": "40px", "height": "40px"}),
+                html.H5("MARKET INTELLIGENCE BULLETIN", className="bank-forecast-title"),
                 html.P(
                     f"Report Date: {datetime.now().strftime('%B %d, %Y')}",
-                    className="bankForecastDate"
+                    className="bank-forecast-date"
                 ),
-            ], className="bankForecastHeader"),
+            ], className="bank-forecast-header"),
             
             html.P(
                 "Our Intelligence Research Department provides comprehensive analysis of market news "
                 "and sentiment for selected investment opportunities. This department examines "
                 "public information sources to validate technical predictions with qualitative insights.",
-                className="bankText"
+                className="bank-text"
             ),
             
             html.Div([
                 html.Div([
-                    html.Span("CONFIDENTIAL", className="confidentialStamp")
-                ], className="stampContainer"),
+                    html.Span("CONFIDENTIAL", className="confidential-stamp")
+                ], className="stamp-container"),
                 
                 html.P(
                     "Select securities with positive forecasts for intelligence gathering:",
-                    className="bankLabel"
+                    className="bank-label"
                 ),
                 
                 # Dropdown to select stocks
@@ -52,26 +52,26 @@ def get_layout():
                     id='research-stocks-dropdown',
                     multi=True,
                     placeholder="Select securities for intelligence analysis...",
-                    className="bankDropdown"
+                    className="bank-dropdown"
                 ),
                 
                 html.Button(
                     "Request Intelligence Report", 
                     id='research-button', 
                     n_clicks=0, 
-                    className="bankButton",
-                    style={"marginTop": "20px", "marginBottom": "20px"}
+                    className="bank-button",
+                    style={"margin-top": "20px", "margin-bottom": "20px"}
                 ),
                 
                 # Loading indicator
                 dcc.Loading(
-                    id="researchLoading",
+                    id="research-loading",
                     type="default",
-                    children=html.Div(id="researchOutput")
+                    children=html.Div(id="research-output")
                 )
-            ], className="bankCardContent")
-        ], className="bankCard"),
-    ], id='research-content', className="bankSection")
+            ], className="bank-card-content")
+        ], className="bank-card"),
+    ], id='research-content', className="bank-section")
 
 # Callback to populate dropdown with stocks that have positive predictions
 @callback(
@@ -139,7 +139,7 @@ def generate_research_report(n_clicks, selected_stocks, tab):
         html component: Research report.
     """
     if n_clicks == 0 or tab != 'research' or not selected_stocks:
-        return html.P("Select securities and request intelligence to generate a report.", className="bankText")
+        return html.P("Select securities and request intelligence to generate a report.", className="bank-text")
     
     # Create a vintage-style research report
     report_sections = []
@@ -162,7 +162,7 @@ def generate_research_report(n_clicks, selected_stocks, tab):
             # Header - always visible with improved layout
             html.Div([
                 html.Div([
-                    html.H5(f"SECURITY: {symbol}", style={"display": "inlineBlock", "margin": "0"}),
+                    html.H5(f"SECURITY: {symbol}", style={"display": "inline-block", "margin": "0"}),
                     html.Span(
                         news_data.get('sentiment', 'Unknown').upper(),
                         className=f"sentiment-badge {sentiment_class}",
@@ -179,7 +179,7 @@ def generate_research_report(n_clicks, selected_stocks, tab):
                     "▼",
                     id=f'stock-expand-button-{i}',  # Fixed ID with index
                     n_clicks=0,
-                    className="bankExpandButton",
+                    className="bank-expand-button",
                     style={
                         "position": "absolute",
                         "right": "15px",
@@ -193,7 +193,7 @@ def generate_research_report(n_clicks, selected_stocks, tab):
                         "zIndex": "10"
                     }
                 )
-            ], className="stockHeader", style={
+            ], className="stock-header", style={
                 "backgroundColor": "var(--bank-cream)", 
                 "padding": "15px", 
                 "borderRadius": "4px 4px 0 0", 
@@ -206,47 +206,47 @@ def generate_research_report(n_clicks, selected_stocks, tab):
             html.Div([
                 # Sentiment reasoning
                 html.Div([
-                    html.H6("SENTIMENT ANALYSIS:", className="researchSubtitle"),
-                    html.P(news_data.get('sentiment_reasoning', 'No sentiment analysis available.'), className="bankText")
-                ], className="sentimentSection"),
+                    html.H6("SENTIMENT ANALYSIS:", className="research-subtitle"),
+                    html.P(news_data.get('sentiment_reasoning', 'No sentiment analysis available.'), className="bank-text")
+                ], className="sentiment-section"),
                 
                 # Impact summary
                 html.Div([
-                    html.H6("MARKET IMPACT ASSESSMENT:", className="researchSubtitle"),
-                    html.P(news_data.get('impact_summary', 'No impact assessment available.'), className="bankText")
-                ], className="impactSection"),
+                    html.H6("MARKET IMPACT ASSESSMENT:", className="research-subtitle"),
+                    html.P(news_data.get('impact_summary', 'No impact assessment available.'), className="bank-text")
+                ], className="impact-section"),
                 
                 # News items
                 html.Div([
-                    html.H6("INTELLIGENCE FINDINGS:", className="researchSubtitle"),
+                    html.H6("INTELLIGENCE FINDINGS:", className="research-subtitle"),
                     html.Ul([
                         html.Li([
-                            html.Span(f"{item.get('date', 'N/A')}: ", className="newsDate"),
-                            html.Span(item.get('headline', 'No headline available'), className="newsHeadline"),
-                            html.P(item.get('summary', ''), className="newsSummary"),
-                            html.A("Source", href=item.get('url', '#'), target="_blank", className="newsLink")
-                        ], className="newsItem")
+                            html.Span(f"{item.get('date', 'N/A')}: ", className="news-date"),
+                            html.Span(item.get('headline', 'No headline available'), className="news-headline"),
+                            html.P(item.get('summary', ''), className="news-summary"),
+                            html.A("Source", href=item.get('url', '#'), target="_blank", className="news-link")
+                        ], className="news-item")
                         for item in news_data.get('news_items', [])
-                    ], className="newsList") if news_data.get('news_items') else html.P("No significant news items found.", className="bankText")
-                ], className="newsSection")
+                    ], className="news-list") if news_data.get('news_items') else html.P("No significant news items found.", className="bank-text")
+                ], className="news-section")
             ], 
             id=f'stock-content-{i}',  # Fixed ID with index
-            className="stockContent",
+            className="stock-content",
             style={"display": "none", "padding": "15px", "backgroundColor": "white", "borderRadius": "0 0 4px 4px", "marginBottom": "20px", "borderTop": "none"}
             )
-        ], className="research-section slide-in", style={"AnimationOrder": i, "marginBottom": "15px", "border": "1px solid var(--bank-border)", "borderRadius": "4px"})
+        ], className="research-section slide-in", style={"--animation-order": i, "marginBottom": "15px", "border": "1px solid var(--bank-border)", "borderRadius": "4px"})
         
         report_sections.append(section)
     
     # Create the full report with accordion-style dropdowns
     report = html.Div([
         html.Div([
-            html.H5("MARKET INTELLIGENCE REPORT", className="reportTitle"),
-            html.P(f"Generated: {datetime.now().strftime('%B %d, %Y %H:%M')}", className="reportDate"),
-            html.P("CLASSIFICATION: CONFIDENTIAL - FOR INTERNAL USE ONLY", className="reportClassification")
-        ], className="reportHeader"),
+            html.H5("MARKET INTELLIGENCE REPORT", className="report-title"),
+            html.P(f"Generated: {datetime.now().strftime('%B %d, %Y %H:%M')}", className="report-date"),
+            html.P("CLASSIFICATION: CONFIDENTIAL - FOR INTERNAL USE ONLY", className="report-classification")
+        ], className="report-header"),
         
-        html.Div(report_sections, className="reportBody"),
+        html.Div(report_sections, className="report-body"),
         
         html.Div([
             html.P(
@@ -254,14 +254,14 @@ def generate_research_report(n_clicks, selected_stocks, tab):
                 "The Research Department provides this information for consideration alongside technical analysis, "
                 "but does not guarantee accuracy or completeness. All investment decisions remain the "
                 "responsibility of the investor.",
-                className="reportDisclaimer"
+                className="report-disclaimer"
             ),
             html.Div([
-                html.Span("DEPARTMENT OF MARKET INTELLIGENCE", className="departmentName"),
-                html.Div(className="departmentSeal")
-            ], className="reportFooterContent")
-        ], className="reportFooter")
-    ], className="researchReport")
+                html.Span("DEPARTMENT OF MARKET INTELLIGENCE", className="department-name"),
+                html.Div(className="department-seal")
+            ], className="report-footer-content")
+        ], className="report-footer")
+    ], className="research-report")
     
     return report
 

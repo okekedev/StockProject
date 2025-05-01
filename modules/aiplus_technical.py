@@ -13,6 +13,7 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import os
 import json
+import re
 from scipy import stats
 from sklearn.preprocessing import StandardScaler
 import config
@@ -20,6 +21,56 @@ import config
 # Constants
 DATA_CACHE_DIR = os.path.join(config.DATA_DIR, "aiplus_cache")
 os.makedirs(DATA_CACHE_DIR, exist_ok=True)
+
+# Function to make data safe for JSON serialization
+def make_json_safe(data):
+    """Recursively convert all values to JSON-safe types."""
+    if isinstance(data, dict):
+        return {k: make_json_safe(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [make_json_safe(item) for item in data]
+    elif isinstance(data, tuple):
+        return [make_json_safe(item) for item in data]
+    elif isinstance(data, bool):
+        return int(data)  # Convert bool to int
+    elif isinstance(data, (np.int64, np.int32, np.float64, np.float32)):
+        return float(data) if np.issubdtype(type(data), np.floating) else int(data)
+    elif pd.isna(data) or data is None:
+        return None
+    elif isinstance(data, pd.Timestamp):
+        return data.isoformat()
+    elif isinstance(data, pd.Series):
+        return make_json_safe(data.to_dict())
+    elif isinstance(data, pd.DataFrame):
+        return make_json_safe(data.to_dict(orient='records'))
+    elif isinstance(data, np.ndarray):
+        return make_json_safe(data.tolist())
+    elif hasattr(data, 'tolist'):  # For other numpy arrays and types
+        return make_json_safe(data.tolist())
+    elif not isinstance(data, (str, int, float)):
+        return str(data)  # Convert non-serializable objects to strings
+    return data
+
+# Custom JSON encoder for handling non-serializable types
+class CustomJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles non-serializable types."""
+    def default(self, obj):
+        if isinstance(obj, bool):
+            return int(obj)  # Convert True to 1, False to 0
+        elif isinstance(obj, (np.int64, np.int32, np.float64, np.float32)):
+            return float(obj) if np.issubdtype(type(obj), np.floating) else int(obj)
+        elif pd.isna(obj) or obj is None:
+            return None
+        elif isinstance(obj, pd.Timestamp):
+            return obj.isoformat()
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif hasattr(obj, 'tolist'):  # For other numpy arrays and types
+            return obj.tolist()
+        elif hasattr(obj, '__dict__'):  # For general objects
+            return {key: value for key, value in obj.__dict__.items() 
+                    if not key.startswith('_')}
+        return str(obj)  # Last resort: convert to string
 
 
 class AIplusTechnicalAnalyzer:
@@ -110,10 +161,16 @@ class AIplusTechnicalAnalyzer:
             self.cache[cache_key] = result
             self.last_fetch_time[cache_key] = datetime.now()
             
+            # Make data safe for JSON serialization
+            safe_result = make_json_safe(result)
+            
             # Save to disk cache
-            result['timestamp'] = datetime.now().isoformat()
-            with open(cache_file, 'w') as f:
-                json.dump(result, f)
+            safe_result['timestamp'] = datetime.now().isoformat()
+            try:
+                with open(cache_file, 'w') as f:
+                    json.dump(safe_result, f, cls=CustomJSONEncoder)  # Use the custom encoder as a backup
+            except Exception as e:
+                print(f"Warning: Could not save cache file for {symbol}: {e}")
             
             return result
             
@@ -481,10 +538,26 @@ class AIplusTechnicalAnalyzer:
             
             if len(top_indexes) >= 2:
                 # Check if the tops are separated and at similar price levels
-                date_diffs = [(top_indexes[i] - top_indexes[i-1]).days for i in range(1, len(top_indexes))]
-                price_diffs = [abs(recent_df.loc[top_indexes[i], 'High'] - recent_df.loc[top_indexes[i-1], 'High']) / recent_df.loc[top_indexes[i-1], 'High'] for i in range(1, len(top_indexes))]
+                date_diffs = []
+                price_diffs = []
                 
-                if any(diff >= 5 and diff <= 20 for diff in date_diffs) and any(diff <= 0.03 for diff in price_diffs):
+                for i in range(1, len(top_indexes)):
+                    # Calculate date difference in days
+                    date_diff = (top_indexes[i] - top_indexes[i-1]).days
+                    if not pd.isna(date_diff):
+                        date_diffs.append(date_diff)
+                    
+                    # Calculate price difference as percentage
+                    high1 = recent_df.loc[top_indexes[i-1], 'High']
+                    high2 = recent_df.loc[top_indexes[i], 'High']
+                    if high1 > 0:  # Avoid division by zero
+                        price_diff = abs(high2 - high1) / high1
+                        price_diffs.append(price_diff)
+                
+                # Check if any pairs meet the criteria
+                if (date_diffs and price_diffs and
+                    any(diff >= 5 and diff <= 20 for diff in date_diffs) and 
+                    any(diff <= 0.03 for diff in price_diffs)):
                     patterns['double_top'] = {
                         'detected': True,
                         'confidence': 'medium',
@@ -542,66 +615,92 @@ class AIplusTechnicalAnalyzer:
         Returns:
             dict: Support and resistance levels
         """
-        # Use pivot points for support/resistance detection
-        levels = {}
-        
-        # Calculate typical price
-        typical_price = (df['High'] + df['Low'] + df['Close']) / 3
-        
-        # Previous period high, low, close
-        prev_high = df['High'].iloc[-2]
-        prev_low = df['Low'].iloc[-2]
-        prev_close = df['Close'].iloc[-2]
-        
-        # Calculate pivot point
-        pivot = (prev_high + prev_low + prev_close) / 3
-        
-        # Calculate support and resistance levels
-        s1 = (2 * pivot) - prev_high
-        s2 = pivot - (prev_high - prev_low)
-        r1 = (2 * pivot) - prev_low
-        r2 = pivot + (prev_high - prev_low)
-        
-        # Current price
-        current_price = df['Close'].iloc[-1]
-        
-        # Determine closest levels
-        price_levels = [s2, s1, pivot, r1, r2]
-        level_names = ["S2", "S1", "Pivot", "R1", "R2"]
-        
-        # Calculate distance to each level
-        distances = [abs(level - current_price) / current_price * 100 for level in price_levels]
-        
-        # Find nearest level
-        nearest_idx = distances.index(min(distances))
-        nearest_level = level_names[nearest_idx]
-        nearest_value = price_levels[nearest_idx]
-        
-        # Determine if price is near support or resistance
-        is_support = nearest_idx < 2  # S2 or S1
-        is_resistance = nearest_idx > 2  # R1 or R2
-        
-        # Return levels
-        return {
-            'levels': {
-                'S2': s2,
-                'S1': s1,
-                'Pivot': pivot,
-                'R1': r1,
-                'R2': r2
-            },
-            'nearest': {
-                'level': nearest_level,
-                'value': nearest_value,
-                'distance_pct': distances[nearest_idx]
-            },
-            'interpretation': {
-                'is_near_support': is_support,
-                'is_near_resistance': is_resistance,
-                'at_level': distances[nearest_idx] < 0.5  # Within 0.5% of a level
+        try:
+            # Use pivot points for support/resistance detection
+            # Check if we have enough data
+            if len(df) < 3:
+                return {"error": "Insufficient data for support/resistance detection"}
+            
+            # Previous period high, low, close as float values (not numpy or pandas types)
+            prev_high = float(df['High'].iloc[-2])
+            prev_low = float(df['Low'].iloc[-2])
+            prev_close = float(df['Close'].iloc[-2])
+            
+            # Calculate pivot point
+            pivot = float((prev_high + prev_low + prev_close) / 3)
+            
+            # Calculate support and resistance levels as float
+            s1 = float((2 * pivot) - prev_high)
+            s2 = float(pivot - (prev_high - prev_low))
+            r1 = float((2 * pivot) - prev_low)
+            r2 = float(pivot + (prev_high - prev_low))
+            
+            # Current price as float
+            current_price = float(df['Close'].iloc[-1])
+            
+            # Determine closest levels - create primitive Python lists
+            price_levels = [float(s2), float(s1), float(pivot), float(r1), float(r2)]
+            level_names = ["S2", "S1", "Pivot", "R1", "R2"]
+            
+            # Calculate distance to each level
+            try:
+                distances = []
+                for level in price_levels:
+                    if current_price > 0:  # Avoid division by zero
+                        distance = abs(level - current_price) / current_price * 100
+                        distances.append(float(distance))
+                    else:
+                        distances.append(float(0))
+            except Exception as e:
+                print(f"Error calculating distances: {e}")
+                distances = [float(0), float(0), float(0), float(0), float(0)]
+            
+            # Find nearest level
+            try:
+                nearest_idx = distances.index(min(distances))
+            except Exception as e:
+                print(f"Error finding nearest index: {e}")
+                nearest_idx = 2  # Default to pivot
+            
+            nearest_level = level_names[nearest_idx]
+            nearest_value = price_levels[nearest_idx]
+            
+            # Determine if price is near support or resistance
+            is_support = nearest_idx < 2  # S2 or S1
+            is_resistance = nearest_idx > 2  # R1 or R2
+            at_level = False
+            if len(distances) > nearest_idx:
+                at_level = distances[nearest_idx] < 0.5  # Within 0.5% of a level
+            
+            # Convert boolean values to integers for JSON serialization
+            is_support_int = 1 if is_support else 0
+            is_resistance_int = 1 if is_resistance else 0
+            at_level_int = 1 if at_level else 0
+            
+            # Return levels as a dictionary with primitive types only
+            return {
+                'levels': {
+                    'S2': float(s2),
+                    'S1': float(s1),
+                    'Pivot': float(pivot),
+                    'R1': float(r1),
+                    'R2': float(r2)
+                },
+                'nearest': {
+                    'level': str(nearest_level),
+                    'value': float(nearest_value),
+                    'distance_pct': float(distances[nearest_idx]) if nearest_idx < len(distances) else float(0)
+                },
+                'interpretation': {
+                    'is_near_support': is_support_int,
+                    'is_near_resistance': is_resistance_int,
+                    'at_level': at_level_int
+                }
             }
-        }
-    
+        except Exception as e:
+            print(f"Error in support/resistance detection: {e}")
+            return {"error": str(e)}
+        
     def _generate_technical_summary(self, price, price_change, volatility, 
                                    indicators, momentum, tsmn):
         """
