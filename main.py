@@ -18,6 +18,8 @@ from layouts import selection_tab
 from layouts import test_tab 
 from layouts import predict_tab
 from layouts import research_tab
+from layouts import aiplus_tab
+
 
 # Load data
 screener_df = load_data(config.INPUT_FILE, [
@@ -34,7 +36,8 @@ tech_df = load_data(config.TECH_DATA_FILE, [
 app = Dash(
     __name__, 
     external_stylesheets=[dbc.themes.BOOTSTRAP],
-    assets_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets')
+    assets_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets'),
+    suppress_callback_exceptions=True  # Add this line
 )
 
 # Define app layout with 1940s bank theme
@@ -42,8 +45,8 @@ app.layout = html.Div([
     # Bank Header with Emblem
     html.Header([
         html.Div(className="bank-emblem"),
-        html.H1("Stock Analysis Bureau", className="bank-title"),
-        html.P("Financial Intelligence Since 1940", className="bank-subtitle")
+        html.H1("Sundai Stocks", className="bank-title"),
+        html.P("Financial Intelligence Using Math + AI", className="bank-subtitle")
     ], className="bank-header"),
     
     # Main Container
@@ -51,11 +54,18 @@ app.layout = html.Div([
         # Navigation Tabs
         dcc.Tabs([
             dcc.Tab(label='Stock Download', value='download', className="bank-tab", selected_className="bank-tab--selected"),
-            dcc.Tab(label='Stock Selection', value='selection', className="bank-tab", selected_className="bank-tab--selected"),
-            dcc.Tab(label='Fetch Technical Data', value='technical', className="bank-tab", selected_className="bank-tab--selected"),
-            dcc.Tab(label='Test Model', value='test', className="bank-tab", selected_className="bank-tab--selected"),
-            dcc.Tab(label='Predict Stocks', value='predict', className="bank-tab", selected_className="bank-tab--selected"),
-            dcc.Tab(label='Research Department', value='research', className="bank-tab", selected_className="bank-tab--selected"),
+            dcc.Tab(label='Screener', value='selection', className="bank-tab", selected_className="bank-tab--selected"),
+            dcc.Tab(label='Fetch Data', value='technical', className="bank-tab", selected_className="bank-tab--selected"),
+            dcc.Tab(label='Test Predictions', value='test', className="bank-tab", selected_className="bank-tab--selected"),
+            dcc.Tab(label='Predict Trends', value='predict', className="bank-tab", selected_className="bank-tab--selected"),
+            dcc.Tab(label='Research', value='research', className="bank-tab", selected_className="bank-tab--selected"),
+            dcc.Tab(
+    label='AI+ Prediction', 
+    value='aiplus', 
+    className="bank-tab", 
+    selected_className="bank-tab--selected",
+    # Same styling as your other tabs
+)
         ], value='download', id='tabs', className="bank-tabs"),
         
         # Tab content containers with bank theme styling
@@ -83,7 +93,8 @@ app.layout = html.Div([
      Output('technical-content', 'style'),
      Output('test-content', 'style'),
      Output('predict-content', 'style'),
-     Output('research-content', 'style')],
+     Output('research-content', 'style'),
+     Output('aiplus-content', 'style')],  # Add this output
     Input('tabs', 'value')
 )
 def toggle_tab_content(tab):
@@ -105,7 +116,8 @@ def toggle_tab_content(tab):
         current_style if tab == 'technical' else styles,
         current_style if tab == 'test' else styles,
         current_style if tab == 'predict' else styles,
-        current_style if tab == 'research' else styles
+        current_style if tab == 'research' else styles,
+        current_style if tab == 'aiplus' else styles,  # Add this line
     )
 
 # Run the app

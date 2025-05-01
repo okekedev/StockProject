@@ -1,7 +1,7 @@
 """
-Updated Research Department that uses News API for stock news.
+Updated Research Department that uses News API for stock news with expandable dropdowns.
 """
-from dash import html, dcc, callback, Output, Input, State
+from dash import html, dcc, callback, Output, Input, State, ALL, MATCH
 import dash_bootstrap_components as dbc
 import pandas as pd
 import os
@@ -128,7 +128,7 @@ def populate_research_dropdown(tab):
 )
 def generate_research_report(n_clicks, selected_stocks, tab):
     """
-    Generate a research report for selected stocks.
+    Generate a research report for selected stocks with expandable dropdowns.
     
     Args:
         n_clicks (int): Number of button clicks.
@@ -144,30 +144,77 @@ def generate_research_report(n_clicks, selected_stocks, tab):
     # Create a vintage-style research report
     report_sections = []
     
-    # Check if API keys are set
-    if 'NEWS_API_KEY' not in os.environ:
-        os.environ['NEWS_API_KEY'] = config.NEWS_API_KEY
-    if 'GEMINI_API_KEY' not in os.environ:
-        os.environ['GEMINI_API_KEY'] = config.GEMINI_API_KEY
-    
     # Process each selected stock - use past 3 days of news
     for i, symbol in enumerate(selected_stocks):
         # Get stock analysis using News API and Gemini
         news_data = get_stock_analysis(symbol, days_lookback=3)
         
-        # Create a report section for this stock
+        # Determine sentiment class for styling
+        sentiment = news_data.get('sentiment', 'unknown').lower()
+        sentiment_class = {
+            'positive': 'positive-sentiment',
+            'negative': 'negative-sentiment',
+            'neutral': 'neutral-sentiment'
+        }.get(sentiment, 'unknown-sentiment')
+        
+        # Create a collapsible section for this stock
         section = html.Div([
+            # Header - always visible with improved layout
             html.Div([
-                html.H5(f"SECURITY: {symbol}", className="research-stock-title"),
-                
-                # Sentiment indicator
                 html.Div([
-                    html.Span("MARKET SENTIMENT:", className="sentiment-label"),
+                    html.H5(f"SECURITY: {symbol}", style={"display": "inline-block", "margin": "0"}),
                     html.Span(
                         news_data.get('sentiment', 'Unknown').upper(),
-                        className=f"sentiment-value {news_data.get('sentiment', 'unknown').lower()}-sentiment"
+                        className=f"sentiment-badge {sentiment_class}",
+                        style={
+                            "padding": "4px 10px", 
+                            "borderRadius": "4px",
+                            "marginLeft": "15px"
+                        }
                     )
-                ], className="sentiment-indicator"),
+                ], style={"display": "flex", "alignItems": "center"}),
+                
+                # Improved expand/collapse button
+                html.Button(
+                    "▼",
+                    id=f'stock-expand-button-{i}',  # Fixed ID with index
+                    n_clicks=0,
+                    className="bank-expand-button",
+                    style={
+                        "position": "absolute",
+                        "right": "15px",
+                        "top": "15px",
+                        "backgroundColor": "transparent",
+                        "border": "1px solid var(--bank-border)",
+                        "borderRadius": "4px",
+                        "fontSize": "16px",
+                        "cursor": "pointer",
+                        "padding": "2px 10px",
+                        "zIndex": "10"
+                    }
+                )
+            ], className="stock-header", style={
+                "backgroundColor": "var(--bank-cream)", 
+                "padding": "15px", 
+                "borderRadius": "4px 4px 0 0", 
+                "borderBottom": "1px solid var(--bank-border)",
+                "position": "relative",
+                "cursor": "pointer"
+            }),
+            
+            # Collapsible content with fixed ID
+            html.Div([
+                # Sentiment reasoning
+                html.Div([
+                    html.H6("SENTIMENT ANALYSIS:", className="research-subtitle"),
+                    html.P(news_data.get('sentiment_reasoning', 'No sentiment analysis available.'), className="bank-text")
+                ], className="sentiment-section"),
+                
+                # Impact summary
+                html.Div([
+                    html.H6("MARKET IMPACT ASSESSMENT:", className="research-subtitle"),
+                    html.P(news_data.get('impact_summary', 'No impact assessment available.'), className="bank-text")
+                ], className="impact-section"),
                 
                 # News items
                 html.Div([
@@ -181,32 +228,17 @@ def generate_research_report(n_clicks, selected_stocks, tab):
                         ], className="news-item")
                         for item in news_data.get('news_items', [])
                     ], className="news-list") if news_data.get('news_items') else html.P("No significant news items found.", className="bank-text")
-                ], className="news-section"),
-                
-                # Sentiment reasoning
-                html.Div([
-                    html.H6("SENTIMENT ANALYSIS:", className="research-subtitle"),
-                    html.P(news_data.get('sentiment_reasoning', 'No sentiment analysis available.'), className="bank-text")
-                ], className="sentiment-section"),
-                
-                # Impact summary
-                html.Div([
-                    html.H6("MARKET IMPACT ASSESSMENT:", className="research-subtitle"),
-                    html.P(news_data.get('impact_summary', 'No impact assessment available.'), className="bank-text")
-                ], className="impact-section"),
-                
-                # Department stamp
-                html.Div([
-                    html.Div([
-                        html.Span("VERIFIED", className="verified-stamp")
-                    ], className="stamp-container")
-                ], className="stamp-section")
-            ], className="research-stock-section")
-        ], className="research-section slide-in", style={"--animation-order": i})
+                ], className="news-section")
+            ], 
+            id=f'stock-content-{i}',  # Fixed ID with index
+            className="stock-content",
+            style={"display": "none", "padding": "15px", "backgroundColor": "white", "borderRadius": "0 0 4px 4px", "marginBottom": "20px", "borderTop": "none"}
+            )
+        ], className="research-section slide-in", style={"--animation-order": i, "marginBottom": "15px", "border": "1px solid var(--bank-border)", "borderRadius": "4px"})
         
         report_sections.append(section)
     
-    # Create the full report
+    # Create the full report with accordion-style dropdowns
     report = html.Div([
         html.Div([
             html.H5("MARKET INTELLIGENCE REPORT", className="report-title"),
@@ -232,3 +264,31 @@ def generate_research_report(n_clicks, selected_stocks, tab):
     ], className="research-report")
     
     return report
+
+# Define callbacks for a fixed number of potential stocks (10)
+for i in range(10):
+    @callback(
+        Output(f'stock-content-{i}', 'style'),
+        Output(f'stock-expand-button-{i}', 'children'),
+        Input(f'stock-expand-button-{i}', 'n_clicks'),
+        prevent_initial_call=True
+    )
+    def toggle_content(n_clicks, i=i):  # Capture i in closure
+        if n_clicks and n_clicks % 2 == 1:  # Odd clicks - show content
+            return {
+                "display": "block", 
+                "padding": "15px", 
+                "backgroundColor": "white", 
+                "borderRadius": "0 0 4px 4px", 
+                "marginBottom": "20px", 
+                "borderTop": "none"
+            }, "▲"
+        else:  # Even clicks or initial state - hide content
+            return {
+                "display": "none", 
+                "padding": "15px", 
+                "backgroundColor": "white", 
+                "borderRadius": "0 0 4px 4px", 
+                "marginBottom": "20px", 
+                "borderTop": "none"
+            }, "▼"

@@ -341,3 +341,43 @@ tr:hover {
     color: var(--bank-text-medium);
     font-size: 0.9rem;
 }
+
+/* Dropdown styles for the research tab */
+.stock-header {
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.stock-header:hover {
+    background-color: var(--bank-highlight) !important;
+}
+
+.bank-expand-button:hover {
+    color: var(--bank-gold);
+}
+
+.sentiment-badge {
+    font-family: 'Roboto Slab', serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.positive-sentiment {
+    background-color: var(--bank-success);
+    color: white;
+}
+
+.negative-sentiment {
+    background-color: var(--bank-error);
+    color: white;
+}
+
+.neutral-sentiment {
+    background-color: var(--bank-info);
+    color: white;
+}
+
+.unknown-sentiment {
+    background-color: var(--bank-text-medium);
+    color: white;
+}

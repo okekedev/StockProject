@@ -1,0 +1,153 @@
+/* Dropdown styles for the research tab */
+.stock-header {
+    cursor: pointer;
+    transition: background-color 0.3s;
+    position: relative;
+}
+
+.stock-header:hover {
+    background-color: var(--bank-highlight) !important;
+}
+
+.bank-expand-button {
+    cursor: pointer !important;
+    transition: color 0.2s;
+    z-index: 10;
+    position: relative;
+}
+
+.bank-expand-button:hover {
+    color: var(--bank-gold);
+}
+
+.sentiment-badge {
+    font-family: 'Roboto Slab', serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.positive-sentiment {
+    background-color: var(--bank-success);
+    color: white;
+}
+
+.negative-sentiment {
+    background-color: var(--bank-error);
+    color: white;
+}
+
+.neutral-sentiment {
+    background-color: var(--bank-info);
+    color: white;
+}
+
+.unknown-sentiment {
+    background-color: var(--bank-text-medium);
+    color: white;
+}
+
+/* Make sure stock content is accessible through click */
+.stock-content {
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+/* Ensure stock header is clickable */
+.research-section {
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.news-date {
+    font-weight: bold;
+    color: var(--bank-text-medium);
+}
+
+.news-headline {
+    font-weight: 600;
+}
+
+.news-summary {
+    margin-top: 5px;
+    margin-bottom: 5px;
+    font-style: italic;
+    color: var(--bank-text-medium);
+}
+
+.news-item {
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--bank-border);
+    padding-bottom: 10px;
+}
+
+.news-link {
+    display: inline-block;
+    font-size: 0.8rem;
+    padding: 2px 8px;
+    background-color: var(--bank-green-light);
+    color: var(--bank-text-light);
+    border-radius: 4px;
+    text-decoration: none;
+}
+
+.news-link:hover {
+    background-color: var(--bank-green);
+}
+
+.research-subtitle {
+    font-family: 'Roboto Slab', serif;
+    color: var(--bank-green);
+    border-bottom: 1px solid var(--bank-gold);
+    padding-bottom: 5px;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.report-title {
+    text-align: center;
+    font-size: 1.5rem;
+    color: var(--bank-green);
+    margin-bottom: 10px;
+}
+
+.report-date, .report-classification {
+    text-align: center;
+    color: var(--bank-text-medium);
+    margin-bottom: 5px;
+}
+
+.report-classification {
+    font-weight: bold;
+    color: var(--bank-error);
+    margin-bottom: 20px;
+}
+
+.report-header {
+    border-bottom: 2px solid var(--bank-gold);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.report-footer {
+    margin-top: 30px;
+    padding-top: 15px;
+    border-top: 2px solid var(--bank-gold);
+}
+
+.report-disclaimer {
+    font-size: 0.8rem;
+    color: var(--bank-text-medium);
+    font-style: italic;
+}
+
+.department-name {
+    font-family: 'Roboto Slab', serif;
+    font-weight: 600;
+    display: block;
+    text-align: center;
+    margin-top: 10px;
+}
+
+.sentiment-section, .impact-section {
+    margin-bottom: 20px;
+}

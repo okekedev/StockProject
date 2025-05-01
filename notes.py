@@ -1,0 +1,1 @@
+whatre you thoughts on sending all the technical indicators for a given stock and the recent 1 month news for a stock to gemini and prompt gemini to give its predictions and interate until it feel confident by running predictions for the previous two weeks vs its computing power until it is predicting accurately?

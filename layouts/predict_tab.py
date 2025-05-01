@@ -38,7 +38,7 @@ def get_layout():
             
             html.Div([
                 html.P(
-                    "IMPORTANT NOTICE: For most accurate next-day predictions, run Technical Data Service "
+                    "IMPORTANT NOTICE: For most accurate next-day predictions, fetch stock data "
                     "after market close (6-7 PM EST) to ensure the latest trading day's data is incorporated "
                     "into the analysis bureau's calculations.",
                     className="bank-notice"
