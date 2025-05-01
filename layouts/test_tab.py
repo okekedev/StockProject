@@ -57,7 +57,7 @@ def get_layout():
                     html.Label(
                         "Target End Date (up to 30 days from start, Tuesday to Friday):",
                         className="bank-label",
-                        style={"margin-top": "15px"}
+                        style={"marginTop": "15px"}
                     ),
                     dcc.Dropdown(
                         id='test-end-date',
@@ -73,7 +73,7 @@ def get_layout():
                         id='test-button', 
                         n_clicks=0, 
                         className="bank-button",
-                        style={"margin-top": "20px"}
+                        style={"marginTop": "20px"}
                     ),
                 ], className="bank-form"),
                 

@@ -1,11 +1,128 @@
 /**
  * AI+ Tab Additional Styles
  * 
- * This file contains additional styles specific to the AI+ tab, extending
- * the main 1940s bank theme with specialized styling for AI analysis display.
+ * This file contains specialized styling for the AI+ tab, extending
+ * the main 1940s bank theme with advanced visualization for AI analysis.
  */
 
-/* AI+ Report Styles */
+/* Subtabs Styling */
+.bank-subtabs {
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--bank-border);
+    display: flex;
+}
+
+.bank-subtab {
+    padding: 0.75rem 1.5rem;
+    background-color: var(--bank-cream);
+    color: var(--bank-text-medium);
+    border: 1px solid var(--bank-border);
+    border-bottom: none;
+    font-family: 'Roboto Slab', serif;
+    font-weight: 500;
+    margin-right: 0.5rem;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.bank-subtab:hover {
+    background-color: var(--bank-parchment);
+    transform: translateY(-2px);
+}
+
+.bank-subtab--selected {
+    background-color: var(--bank-gold-light);
+    color: var(--bank-green-dark);
+    font-weight: 700;
+    border-top: 3px solid var(--bank-gold);
+    border-left: 1px solid var(--bank-gold);
+    border-right: 1px solid var(--bank-gold);
+    position: relative;
+    z-index: 2;
+}
+
+.bank-subtab-content {
+    padding: 1.5rem;
+    background-color: white;
+    border: 1px solid var(--bank-border);
+    border-top: none;
+    box-shadow: 0 4px 8px var(--bank-shadow);
+    position: relative;
+    border-radius: 0 0 8px 8px;
+}
+
+/* Card Layouts */
+.bank-card-row {
+    display: flex;
+    margin: 1.5rem 0;
+    gap: 1.5rem;
+}
+
+.bank-card-half {
+    flex: 1;
+    padding: 1rem;
+    background-color: var(--bank-parchment);
+    border: 1px solid var(--bank-border);
+    border-radius: 4px;
+}
+
+.bank-card-subtitle {
+    color: var(--bank-green);
+    font-size: 1.1rem;
+    border-bottom: 1px solid var(--bank-gold);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.bank-card-footer {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--bank-border);
+}
+
+/* Status Indicators */
+.bank-status {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: var(--bank-cream);
+    border-left: 4px solid var(--bank-text-medium);
+}
+
+.bank-status-large {
+    margin-top: 1rem;
+    padding: 1.5rem;
+    background-color: var(--bank-cream);
+    border-left: 4px solid var(--bank-text-medium);
+    box-shadow: 0 2px 4px var(--bank-shadow);
+}
+
+.status-ready {
+    border-left: 4px solid var(--bank-success);
+    background-color: rgba(45, 106, 80, 0.1);
+}
+
+.status-pending {
+    border-left: 4px solid var(--bank-gold);
+    background-color: rgba(191, 155, 48, 0.1);
+}
+
+.status-error {
+    border-left: 4px solid var(--bank-error);
+    background-color: rgba(145, 58, 58, 0.1);
+}
+
+/* Button styles */
+.bank-button-large {
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    display: block;
+    margin: 2rem auto;
+    min-width: 300px;
+}
+
+/* AI Report Styles */
 .bank-ai-report {
     position: relative;
     background-color: var(--bank-parchment);
@@ -303,24 +420,16 @@
     font-weight: 700;
 }
 
-/* Status indicators */
-.status-ready {
-    border-left: 4px solid var(--bank-success);
-    background-color: rgba(45, 106, 80, 0.1);
-}
-
-.status-pending {
-    border-left: 4px solid var(--bank-gold);
-    background-color: rgba(191, 155, 48, 0.1);
-}
-
-.status-error {
-    border-left: 4px solid var(--bank-error);
-    background-color: rgba(145, 58, 58, 0.1);
-}
-
 /* Responsive adjustments */
 @media (max-width: 768px) {
+    .bank-card-row {
+        flex-direction: column;
+    }
+    
+    .bank-card-half {
+        margin: 0.5rem 0;
+    }
+    
     .prediction-summary-row {
         flex-direction: column;
     }

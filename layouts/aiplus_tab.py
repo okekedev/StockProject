@@ -241,5 +241,3 @@ def populate_aiplus_dropdown(tab):
     except Exception as e:
         print(f"Error loading symbols: {e}")
         return []
-
-# Add more callbacks for each button and functionality

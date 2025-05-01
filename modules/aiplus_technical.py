@@ -141,6 +141,21 @@ class AIplusTechnicalAnalyzer:
         # Basic price metrics
         current_price = df['Close'].iloc[-1]
         
+        # Define start_date based on the timeframe
+        if timeframe == '1mo':
+            days_back = 30
+        elif timeframe == '3mo':
+            days_back = 90
+        elif timeframe == '6mo':
+            days_back = 180
+        elif timeframe == '1y':
+            days_back = 365
+        else:
+            days_back = 30
+        
+        # Calculate start_date from the current date
+        start_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+        
         # Trim the buffer before calculating returns
         if timeframe == '1mo':
             actual_df = df.iloc[-30:]

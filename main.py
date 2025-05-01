@@ -19,6 +19,7 @@ from layouts import test_tab
 from layouts import predict_tab
 from layouts import research_tab
 from layouts import aiplus_tab  # Import the AI+ tab
+from modules import aiplus_callbacks
 
 
 # Load data
@@ -53,14 +54,14 @@ app.layout = html.Div([
     html.Div([
         # Navigation Tabs
         dcc.Tabs([
-            dcc.Tab(label='Stock Download', value='download', className="bank-tab", selected_className="bank-tab--selected"),
+            dcc.Tab(label='Download', value='download', className="bank-tab", selected_className="bank-tab--selected"),
             dcc.Tab(label='Screener', value='selection', className="bank-tab", selected_className="bank-tab--selected"),
             dcc.Tab(label='Fetch Data', value='technical', className="bank-tab", selected_className="bank-tab--selected"),
-            dcc.Tab(label='Test Predictions', value='test', className="bank-tab", selected_className="bank-tab--selected"),
-            dcc.Tab(label='Predict Trends', value='predict', className="bank-tab", selected_className="bank-tab--selected"),
+            dcc.Tab(label='Test', value='test', className="bank-tab", selected_className="bank-tab--selected"),
+            dcc.Tab(label='Predict', value='predict', className="bank-tab", selected_className="bank-tab--selected"),
             dcc.Tab(label='Research', value='research', className="bank-tab", selected_className="bank-tab--selected"),
             dcc.Tab(
-                label='AI+ Prediction', 
+                label='AI+ ', 
                 value='aiplus', 
                 className="bank-tab", 
                 selected_className="bank-tab--selected"
