@@ -159,6 +159,23 @@ def render_gather_data_tab():
             ], className="bank-card-half")
         ], className="bank-card-row"),
         
+        # Prediction Horizon selection
+        html.Div([
+            html.H6("Prediction Horizon", className="bank-card-subtitle"),
+            html.P("Select the timeframe for price prediction:", className="bank-text"),
+            dcc.Dropdown(
+                id='prediction-horizon-dropdown',
+                options=[
+                    {'label': 'Next Day', 'value': '1d'},
+                    {'label': 'Next 2 Days', 'value': '2d'},
+                    {'label': 'Next Week', 'value': '1w'},
+                    {'label': 'Next Month', 'value': '1mo'}
+                ],
+                value='1d',
+                className="bank-dropdown"
+            ),
+        ], className="bank-form-group"),
+        
         # Overall status
         html.Div([
             html.H6("Data Readiness Status", className="bank-card-subtitle"),

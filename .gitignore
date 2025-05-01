@@ -23,6 +23,7 @@ venv/
 .pipenv/
 .env/
 .venv/
+stock_data/
 
 # Ignore OS-specific files
 .DS_Store

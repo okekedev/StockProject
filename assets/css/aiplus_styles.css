@@ -446,3 +446,36 @@
         margin: 0.5rem 0;
     }
 }
+
+/* Combined View Styling */
+.bank-combined-view {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.bank-section-container {
+    background-color: white;
+    border: 1px solid var(--bank-border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px var(--bank-shadow);
+}
+
+.bank-section-heading {
+    color: var(--bank-green);
+    border-bottom: 2px solid var(--bank-gold);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .bank-combined-view {
+        gap: 1.5rem;
+    }
+    
+    .bank-section-container {
+        padding: 1rem;
+    }
+}

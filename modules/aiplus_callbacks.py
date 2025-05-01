@@ -257,6 +257,7 @@ def update_data_readiness(symbol):
     Input('tech-data-status', 'children'),
     Input('news-data-status', 'children'),
     Input('aiplus-stock-dropdown', 'value'),
+    prevent_initial_call=True
 )
 def update_readiness_status(tech_status, news_status, symbol):
     """
@@ -693,7 +694,8 @@ def get_indicator_interpretation(indicator, value):
 # Performance metrics callback
 @callback(
     Output('performance-metrics', 'children'),
-    Input('tabs', 'value')
+    Input('tabs', 'value'),
+    prevent_initial_call=True
 )
 def update_performance_metrics(tab):
     """

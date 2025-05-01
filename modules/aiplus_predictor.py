@@ -27,6 +27,14 @@ load_dotenv()
 PREDICTIONS_DIR = os.path.join(config.DATA_DIR, "aiplus_predictions")
 os.makedirs(PREDICTIONS_DIR, exist_ok=True)
 
+# Prediction horizon mapping for display
+PREDICTION_HORIZON_TEXT = {
+    '1d': 'next day',
+    '2d': 'next two days',
+    '1w': 'next week',
+    '1mo': 'next month'
+}
+
 # Configure Gemini API
 def configure_gemini():
     """Configure the Gemini API with the API key."""
@@ -54,7 +62,7 @@ class AIplusPredictor:
         self.predictions = {}
         self.performance_history = {}
     
-    def generate_prediction(self, symbol, technical_timeframe='1mo', news_days=7, force_refresh=False):
+    def generate_prediction(self, symbol, technical_timeframe='1mo', news_days=7, prediction_horizon='1d', force_refresh=False):
         """
         Generate an enhanced stock prediction using both technical and news data.
         
@@ -62,13 +70,14 @@ class AIplusPredictor:
             symbol (str): Stock symbol
             technical_timeframe (str): Timeframe for technical data
             news_days (int): Days for news analysis
+            prediction_horizon (str): Timeframe for prediction (1d, 2d, 1w, 1mo)
             force_refresh (bool): Whether to force refresh data
             
         Returns:
             dict: Prediction results
         """
         # Create prediction key for caching
-        pred_key = f"{symbol}_{technical_timeframe}_{news_days}"
+        pred_key = f"{symbol}_{technical_timeframe}_{news_days}_{prediction_horizon}"
         cache_file = os.path.join(PREDICTIONS_DIR, f"{pred_key}.json")
         
         # Check for existing predictions
@@ -101,7 +110,9 @@ class AIplusPredictor:
             
             # Step 3: Process the data for prediction
             # This combines both data sources and enhances with AI analysis
-            prediction_results = self._generate_combined_prediction(symbol, technical_data, sentiment_data, technical_timeframe)
+            prediction_results = self._generate_combined_prediction(
+                symbol, technical_data, sentiment_data, technical_timeframe, prediction_horizon
+            )
             
             # Store the prediction
             self.predictions[pred_key] = prediction_results
@@ -117,7 +128,7 @@ class AIplusPredictor:
             print(error_msg)
             return {"error": error_msg}
     
-    def _generate_combined_prediction(self, symbol, technical_data, sentiment_data, technical_timeframe):
+    def _generate_combined_prediction(self, symbol, technical_data, sentiment_data, technical_timeframe, prediction_horizon):
         """
         Combine technical and sentiment data for enhanced prediction.
         
@@ -126,6 +137,7 @@ class AIplusPredictor:
             technical_data (dict): Technical analysis data
             sentiment_data (dict): Sentiment analysis data
             technical_timeframe (str): Timeframe for technical data
+            prediction_horizon (str): Timeframe for prediction
             
         Returns:
             dict: Combined prediction
@@ -162,9 +174,22 @@ class AIplusPredictor:
         # Calculate combined signal (-100 to +100 scale)
         combined_signal = (tsmn_value * tech_weight) + (sentiment_score * sent_weight)
         
-        # Normalize to percent change range based on volatility
+        # Normalize to percent change range based on volatility and prediction horizon
         # Higher volatility = larger potential moves
-        max_move = volatility / 10  # e.g., 30% volatility -> 3% max predicted move
+        # Shorter timeframes = smaller expected moves
+        if prediction_horizon == '1d':
+            # For 1-day prediction, use a smaller fraction of volatility
+            max_move = volatility / 30  # e.g., 30% volatility -> 1% max daily move
+        elif prediction_horizon == '2d':
+            # For 2-day prediction, slightly larger
+            max_move = volatility / 25  # e.g., 30% volatility -> 1.2% max 2-day move
+        elif prediction_horizon == '1w':
+            # For 1-week prediction, larger
+            max_move = volatility / 15  # e.g., 30% volatility -> 2% max weekly move
+        else:
+            # Original scaling for monthly timeframes
+            max_move = volatility / 10  # e.g., 30% volatility -> 3% max move
+            
         predicted_change_pct = combined_signal * max_move / 100
         
         # Calculate confidence level based on signal consensus
@@ -183,9 +208,9 @@ class AIplusPredictor:
             non_neutral_signal = tech_signal if tech_signal != 0 else sent_signal
             confidence = "medium" if abs(combined_signal) > 40 else "low"
         
-        # Generate prediction recommendation
+        # Generate prediction recommendation based on prediction horizon
         recommendation = self._generate_recommendation(
-            predicted_change_pct, confidence, technical_data, sentiment_data
+            predicted_change_pct, confidence, technical_data, sentiment_data, prediction_horizon
         )
         
         # Use LLM to enhance analysis if available
@@ -193,12 +218,15 @@ class AIplusPredictor:
         if self.api_initialized:
             enhanced_analysis = self._generate_llm_analysis(
                 symbol, technical_data, sentiment_data, 
-                predicted_change_pct, confidence
+                predicted_change_pct, confidence, prediction_horizon
             )
         
         # Calculate target prices
         target_low = current_price * (1 + (predicted_change_pct - (volatility / 30)) / 100)
         target_high = current_price * (1 + (predicted_change_pct + (volatility / 30)) / 100)
+        
+        # Get prediction horizon text for display
+        prediction_horizon_text = PREDICTION_HORIZON_TEXT.get(prediction_horizon, 'specified period')
         
         # Compile final prediction
         prediction = {
@@ -213,7 +241,9 @@ class AIplusPredictor:
                 "target_price_low": target_low,
                 "target_price_mid": current_price * (1 + predicted_change_pct / 100),
                 "target_price_high": target_high,
-                "timeframe": technical_timeframe,
+                "data_timeframe": technical_timeframe,
+                "prediction_horizon": prediction_horizon,
+                "prediction_horizon_text": prediction_horizon_text,
                 "recommendation": recommendation
             },
             "technical_contribution": {
@@ -238,7 +268,7 @@ class AIplusPredictor:
         
         return prediction
     
-    def _generate_recommendation(self, predicted_change_pct, confidence, technical_data, sentiment_data):
+    def _generate_recommendation(self, predicted_change_pct, confidence, technical_data, sentiment_data, prediction_horizon):
         """
         Generate investment recommendation based on prediction.
         
@@ -247,6 +277,7 @@ class AIplusPredictor:
             confidence (str): Confidence level
             technical_data (dict): Technical analysis data
             sentiment_data (dict): Sentiment analysis data
+            prediction_horizon (str): Timeframe for prediction
             
         Returns:
             str: Investment recommendation
@@ -255,32 +286,62 @@ class AIplusPredictor:
         volatility = technical_data.get('volatility', 20)
         market_cap = technical_data.get('market_cap', 0)
         
+        # Adjust thresholds based on prediction horizon
+        if prediction_horizon == '1d':
+            # Daily thresholds are smaller
+            strong_threshold = 1.0  # 1% for daily is significant
+            moderate_threshold = 0.5  # 0.5%
+            small_threshold = 0.2  # 0.2%
+            neg_moderate_threshold = -0.5  # -0.5%
+            neg_strong_threshold = -1.0  # -1.0%
+        elif prediction_horizon == '2d':
+            # 2-day thresholds
+            strong_threshold = 1.5  # 1.5%
+            moderate_threshold = 0.8  # 0.8%
+            small_threshold = 0.3  # 0.3%
+            neg_moderate_threshold = -0.8  # -0.8%
+            neg_strong_threshold = -1.5  # -1.5%
+        elif prediction_horizon == '1w':
+            # Weekly thresholds
+            strong_threshold = 2.5  # 2.5%
+            moderate_threshold = 1.2  # 1.2%
+            small_threshold = 0.5  # 0.5%
+            neg_moderate_threshold = -1.2  # -1.2%
+            neg_strong_threshold = -2.5  # -2.5%
+        else:
+            # Monthly thresholds (original)
+            strong_threshold = 5.0  # 5%
+            moderate_threshold = 2.0  # 2%
+            small_threshold = 0.0  # 0%
+            neg_moderate_threshold = -2.0  # -2%
+            neg_strong_threshold = -5.0  # -5%
+        
         # Base recommendation on predicted change and confidence
-        if predicted_change_pct > 5:
+        if predicted_change_pct > strong_threshold:
             if confidence == "high":
                 return "Strong Buy"
             elif confidence == "medium":
                 return "Buy"
             else:
                 return "Speculative Buy"
-        elif predicted_change_pct > 2:
+        elif predicted_change_pct > moderate_threshold:
             if confidence == "high":
                 return "Buy"
             elif confidence == "medium":
                 return "Accumulate"
             else:
                 return "Speculative Buy"
-        elif predicted_change_pct > 0:
+        elif predicted_change_pct > small_threshold:
             if confidence == "high":
                 return "Accumulate"
             else:
                 return "Hold with Positive Bias"
-        elif predicted_change_pct > -2:
+        elif predicted_change_pct > neg_moderate_threshold:
             if confidence == "high":
                 return "Hold with Negative Bias"
             else:
                 return "Hold"
-        elif predicted_change_pct > -5:
+        elif predicted_change_pct > neg_strong_threshold:
             if confidence == "high":
                 return "Reduce"
             elif confidence == "medium":
@@ -331,7 +392,7 @@ class AIplusPredictor:
         
         return key_indicators
     
-    def _generate_llm_analysis(self, symbol, technical_data, sentiment_data, predicted_change_pct, confidence):
+    def _generate_llm_analysis(self, symbol, technical_data, sentiment_data, predicted_change_pct, confidence, prediction_horizon):
         """
         Generate enhanced analysis using LLM.
         
@@ -341,6 +402,7 @@ class AIplusPredictor:
             sentiment_data (dict): Sentiment analysis data
             predicted_change_pct (float): Predicted percentage change
             confidence (str): Confidence level
+            prediction_horizon (str): Timeframe for prediction
             
         Returns:
             str: Enhanced analysis
@@ -376,6 +438,9 @@ class AIplusPredictor:
             Bollinger %B: {bb_percent}
             """
             
+            # Get prediction horizon text for display
+            prediction_horizon_text = PREDICTION_HORIZON_TEXT.get(prediction_horizon, 'specified period')
+            
             # Craft the prompt
             prompt = f"""
             Please provide a concise analysis of {company_name} ({symbol}) based on the following information:
@@ -392,11 +457,14 @@ class AIplusPredictor:
             RECENT NEWS HIGHLIGHTS:
             {news_highlights}
             
+            PREDICTION HORIZON: {prediction_horizon_text}
+            
             PREDICTION:
-            - Predicted Change: {predicted_change_pct:.2f}%
+            - Predicted Change for {prediction_horizon_text}: {predicted_change_pct:.2f}%
             - Confidence: {confidence}
             
-            Generate 2-3 paragraphs of insightful analysis combining both technical and fundamental factors.
+            Generate 2-3 paragraphs of insightful analysis combining both technical and fundamental factors,
+            focusing specifically on the {prediction_horizon_text} outlook.
             Focus on synthesizing information rather than repeating it. Include insights about potential catalysts
             and risks. Be specific about this stock, mentioning the company and industry by name.
             Conclude with a balanced perspective on the investment opportunity.
@@ -415,7 +483,7 @@ class AIplusPredictor:
             print(f"Error generating enhanced analysis: {e}")
             return "Enhanced analysis unavailable. Please refer to the technical and sentiment summaries above."
     
-    def track_prediction_performance(self, symbol, prediction_data, actual_price, timeframe='1mo'):
+    def track_prediction_performance(self, symbol, prediction_data, actual_price, prediction_horizon='1d'):
         """
         Track the performance of a prediction.
         
@@ -423,7 +491,7 @@ class AIplusPredictor:
             symbol (str): Stock symbol
             prediction_data (dict): Original prediction data
             actual_price (float): Actual price at target date
-            timeframe (str, optional): Timeframe used for prediction. Defaults to '1mo'.
+            prediction_horizon (str, optional): Timeframe used for prediction.
             
         Returns:
             dict: Performance metrics
@@ -450,7 +518,7 @@ class AIplusPredictor:
                 "symbol": symbol,
                 "prediction_date": pred_timestamp.strftime('%Y-%m-%d'),
                 "evaluation_date": datetime.now().strftime('%Y-%m-%d'),
-                "timeframe": timeframe,
+                "prediction_horizon": prediction_horizon,
                 "predicted_change_pct": pred_change_pct,
                 "actual_change_pct": actual_change_pct,
                 "correct_direction": correct_direction,
@@ -557,6 +625,20 @@ class AIplusPredictor:
                             "accuracy": sym_accuracy
                         }
             
+            # Calculate metrics by prediction horizon
+            horizon_metrics = {}
+            for horizon in ['1d', '2d', '1w', '1mo']:
+                horizon_history = [item for item in history if item.get('prediction_horizon') == horizon]
+                horizon_total = len(horizon_history)
+                if horizon_total > 0:
+                    horizon_correct = sum(1 for item in horizon_history if item.get('correct_direction', False))
+                    horizon_accuracy = (horizon_correct / horizon_total) * 100
+                    horizon_metrics[horizon] = {
+                        "total_predictions": horizon_total,
+                        "correct_predictions": horizon_correct,
+                        "accuracy": horizon_accuracy
+                    }
+            
             # Compile metrics
             metrics = {
                 "overall": {
@@ -567,6 +649,7 @@ class AIplusPredictor:
                 },
                 "by_confidence": confidence_metrics,
                 "by_symbol": symbol_metrics if len(symbols) > 1 else {},
+                "by_horizon": horizon_metrics,
                 "recent_predictions": sorted(history, key=lambda x: x.get('prediction_date', ''), reverse=True)[:10]
             }
             
@@ -578,7 +661,7 @@ class AIplusPredictor:
 
 
 # Function to generate prediction for a stock
-def generate_aiplus_prediction(symbol, technical_timeframe='1mo', news_days=7, force_refresh=False):
+def generate_aiplus_prediction(symbol, technical_timeframe='1mo', news_days=7, prediction_horizon='1d', force_refresh=False):
     """
     Generate an enhanced stock prediction using AI+.
     
@@ -586,13 +669,14 @@ def generate_aiplus_prediction(symbol, technical_timeframe='1mo', news_days=7, f
         symbol (str): Stock symbol
         technical_timeframe (str): Timeframe for technical data
         news_days (int): Days for news analysis
+        prediction_horizon (str): Timeframe for prediction (1d, 2d, 1w, 1mo)
         force_refresh (bool): Whether to force refresh data
         
     Returns:
         dict: Prediction results
     """
     predictor = AIplusPredictor()
-    return predictor.generate_prediction(symbol, technical_timeframe, news_days, force_refresh)
+    return predictor.generate_prediction(symbol, technical_timeframe, news_days, prediction_horizon, force_refresh)
 
 
 # Function to get performance metrics
@@ -616,7 +700,7 @@ if __name__ == "__main__":
     symbol = "AAPL"
     
     # Generate prediction
-    prediction = generate_aiplus_prediction(symbol, force_refresh=True)
+    prediction = generate_aiplus_prediction(symbol, prediction_horizon='1d', force_refresh=True)
     
     print(json.dumps(prediction, indent=2))
     
