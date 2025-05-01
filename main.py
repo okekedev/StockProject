@@ -18,7 +18,7 @@ from layouts import selection_tab
 from layouts import test_tab 
 from layouts import predict_tab
 from layouts import research_tab
-from layouts import aiplus_tab
+from layouts import aiplus_tab  # Import the AI+ tab
 
 
 # Load data
@@ -60,12 +60,11 @@ app.layout = html.Div([
             dcc.Tab(label='Predict Trends', value='predict', className="bank-tab", selected_className="bank-tab--selected"),
             dcc.Tab(label='Research', value='research', className="bank-tab", selected_className="bank-tab--selected"),
             dcc.Tab(
-    label='AI+ Prediction', 
-    value='aiplus', 
-    className="bank-tab", 
-    selected_className="bank-tab--selected",
-    # Same styling as your other tabs
-)
+                label='AI+ Prediction', 
+                value='aiplus', 
+                className="bank-tab", 
+                selected_className="bank-tab--selected"
+            )
         ], value='download', id='tabs', className="bank-tabs"),
         
         # Tab content containers with bank theme styling
@@ -76,6 +75,7 @@ app.layout = html.Div([
             test_tab.get_layout(),
             predict_tab.get_layout(),
             research_tab.get_layout(),
+            aiplus_tab.get_layout(),  # Add the AI+ tab layout
         ], className="bank-content"),
         
         # Bank Footer
@@ -94,7 +94,7 @@ app.layout = html.Div([
      Output('test-content', 'style'),
      Output('predict-content', 'style'),
      Output('research-content', 'style'),
-     Output('aiplus-content', 'style')],  # Add this output
+     Output('aiplus-content', 'style')],  # Add the AI+ content style output
     Input('tabs', 'value')
 )
 def toggle_tab_content(tab):
@@ -117,7 +117,7 @@ def toggle_tab_content(tab):
         current_style if tab == 'test' else styles,
         current_style if tab == 'predict' else styles,
         current_style if tab == 'research' else styles,
-        current_style if tab == 'aiplus' else styles,  # Add this line
+        current_style if tab == 'aiplus' else styles,  # Add the AI+ content style
     )
 
 # Run the app

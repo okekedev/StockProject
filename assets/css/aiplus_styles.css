@@ -1,0 +1,339 @@
+/**
+ * AI+ Tab Additional Styles
+ * 
+ * This file contains additional styles specific to the AI+ tab, extending
+ * the main 1940s bank theme with specialized styling for AI analysis display.
+ */
+
+/* AI+ Report Styles */
+.bank-ai-report {
+    position: relative;
+    background-color: var(--bank-parchment);
+    border: 1px solid var(--bank-border);
+    padding: 2rem;
+    margin-top: 1.5rem;
+    box-shadow: 0 4px 10px var(--bank-shadow);
+}
+
+.bank-report-title {
+    text-align: center;
+    font-size: 1.8rem;
+    color: var(--bank-green);
+    margin-bottom: 0.5rem;
+}
+
+.bank-report-date {
+    text-align: center;
+    color: var(--bank-text-medium);
+    font-style: italic;
+    margin-bottom: 1.5rem;
+}
+
+.bank-report-header {
+    border-bottom: 3px double var(--bank-gold);
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+.bank-section-heading {
+    color: var(--bank-green);
+    border-bottom: 2px solid var(--bank-gold);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+    margin-top: 2rem;
+}
+
+.bank-subsection-heading {
+    color: var(--bank-green-dark);
+    border-bottom: 1px solid var(--bank-border);
+    padding-bottom: 0.3rem;
+    margin-bottom: 1rem;
+    margin-top: 1.5rem;
+    font-size: 1.2rem;
+}
+
+/* Prediction Summary Styles */
+.bank-prediction-summary {
+    background-color: white;
+    border: 1px solid var(--bank-border);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px var(--bank-shadow);
+}
+
+.prediction-summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.prediction-signal, .prediction-change, .prediction-confidence {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem;
+    border: 1px solid var(--bank-border);
+    background-color: var(--bank-cream);
+    margin: 0 0.5rem;
+}
+
+.bank-value.large-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: block;
+    margin-top: 0.5rem;
+}
+
+.positive {
+    color: var(--bank-success);
+}
+
+.negative {
+    color: var(--bank-error);
+}
+
+.neutral {
+    color: var(--bank-text-medium);
+}
+
+.high-confidence {
+    color: var(--bank-success);
+    font-weight: 700;
+}
+
+.medium-confidence {
+    color: var(--bank-gold);
+    font-weight: 600;
+}
+
+.low-confidence {
+    color: var(--bank-text-medium);
+    font-weight: 500;
+}
+
+.prediction-targets {
+    text-align: center;
+    padding: 1rem;
+    background-color: var(--bank-cream);
+    border: 1px solid var(--bank-border);
+    margin-bottom: 1.5rem;
+}
+
+.target-range {
+    margin-top: 0.5rem;
+    font-size: 1.2rem;
+}
+
+.target-low {
+    color: var(--bank-error);
+}
+
+.target-high {
+    color: var(--bank-success);
+}
+
+.target-mid {
+    font-weight: 700;
+    font-size: 1.3rem;
+}
+
+.target-arrow {
+    color: var(--bank-text-medium);
+    margin: 0 0.5rem;
+}
+
+.prediction-recommendation {
+    text-align: center;
+    padding: 1rem;
+    background-color: var(--bank-green-light);
+    color: white;
+    font-weight: 700;
+    font-size: 1.3rem;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px var(--bank-shadow);
+}
+
+/* Analysis Details Styles */
+.bank-analysis-details {
+    background-color: white;
+    border: 1px solid var(--bank-border);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px var(--bank-shadow);
+}
+
+.signal-contributions {
+    margin: 1rem 0 2rem;
+}
+
+.contribution-row {
+    margin-bottom: 1rem;
+}
+
+.contribution-container {
+    height: 20px;
+    background-color: #f0f0f0;
+    border: 1px solid var(--bank-border);
+    margin: 0.5rem 0;
+    position: relative;
+}
+
+.contribution-bar {
+    height: 100%;
+    position: absolute;
+}
+
+.contribution-bar.technical {
+    background-color: var(--bank-green);
+}
+
+.contribution-bar.sentiment {
+    background-color: var(--bank-gold);
+}
+
+.enhanced-analysis-section {
+    background-color: var(--bank-parchment);
+    padding: 1rem;
+    border-left: 5px solid var(--bank-gold);
+    margin-bottom: 1.5rem;
+}
+
+.enhanced-analysis {
+    font-style: italic;
+    line-height: 1.6;
+}
+
+.bank-news-list {
+    padding-left: 1.5rem;
+}
+
+.bank-news-headline {
+    font-weight: 500;
+}
+
+.bank-news-headline.positive {
+    border-left: 3px solid var(--bank-success);
+    padding-left: 0.5rem;
+}
+
+.bank-news-headline.negative {
+    border-left: 3px solid var(--bank-error);
+    padding-left: 0.5rem;
+}
+
+.bank-news-headline.neutral {
+    border-left: 3px solid var(--bank-text-medium);
+    padding-left: 0.5rem;
+}
+
+.bank-date {
+    font-weight: 600;
+    color: var(--bank-text-medium);
+}
+
+/* Report Footer Styles */
+.bank-report-footer {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 3px double var(--bank-border);
+}
+
+.bank-disclaimer {
+    font-size: 0.8rem;
+    color: var(--bank-text-medium);
+    font-style: italic;
+    margin-bottom: 1rem;
+}
+
+.bank-generation-info {
+    font-size: 0.9rem;
+    color: var(--bank-text-medium);
+    text-align: right;
+}
+
+/* Performance Metrics Styles */
+.bank-metrics-container {
+    margin-top: 1.5rem;
+}
+
+.bank-performance-metrics {
+    background-color: white;
+    border: 1px solid var(--bank-border);
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px var(--bank-shadow);
+}
+
+.metrics-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.metric-box {
+    flex: 1;
+    text-align: center;
+    padding: 1rem;
+    border: 1px solid var(--bank-border);
+    background-color: var(--bank-cream);
+    margin: 0 0.5rem;
+}
+
+.high-accuracy {
+    color: var(--bank-success);
+    font-weight: 700;
+}
+
+.medium-accuracy {
+    color: var(--bank-gold-dark);
+    font-weight: 600;
+}
+
+.low-accuracy {
+    color: var(--bank-error);
+    font-weight: 500;
+}
+
+.success {
+    color: var(--bank-success);
+    font-weight: 700;
+}
+
+.failure {
+    color: var(--bank-error);
+    font-weight: 700;
+}
+
+/* Status indicators */
+.status-ready {
+    border-left: 4px solid var(--bank-success);
+    background-color: rgba(45, 106, 80, 0.1);
+}
+
+.status-pending {
+    border-left: 4px solid var(--bank-gold);
+    background-color: rgba(191, 155, 48, 0.1);
+}
+
+.status-error {
+    border-left: 4px solid var(--bank-error);
+    background-color: rgba(145, 58, 58, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .prediction-summary-row {
+        flex-direction: column;
+    }
+    
+    .prediction-signal, .prediction-change, .prediction-confidence {
+        margin: 0.5rem 0;
+    }
+    
+    .metrics-row {
+        flex-direction: column;
+    }
+    
+    .metric-box {
+        margin: 0.5rem 0;
+    }
+}

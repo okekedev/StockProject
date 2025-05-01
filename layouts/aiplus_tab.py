@@ -65,14 +65,14 @@ def get_layout():
             ),
             
             # Content for the selected subtab
-            html.Div(id='aiplus-content', className="bank-subtab-content")
+            html.Div(id='aiplus-subtab-content', className="bank-subtab-content")
             
         ], className="bank-card"),
     ], id='aiplus-content', className="bank-section")
 
 # Callback to switch between AI+ subtabs
 @callback(
-    Output('aiplus-content', 'children'),
+    Output('aiplus-subtab-content', 'children'),
     Input('aiplus-tabs', 'value')
 )
 def render_aiplus_subtab(subtab):
@@ -126,7 +126,7 @@ def render_gather_data_tab():
                     id='fetch-tech-button', 
                     n_clicks=0, 
                     className="bank-button",
-                    style={"margin-top": "15px"}
+                    style={"marginTop": "15px"}
                 ),
                 
                 html.Div(id='tech-data-status', className="bank-status")
@@ -152,7 +152,7 @@ def render_gather_data_tab():
                     id='fetch-news-button', 
                     n_clicks=0, 
                     className="bank-button",
-                    style={"margin-top": "15px"}
+                    style={"marginTop": "15px"}
                 ),
                 
                 html.Div(id='news-data-status', className="bank-status")
