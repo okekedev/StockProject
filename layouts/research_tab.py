@@ -38,9 +38,7 @@ def get_layout():
             ),
             
             html.Div([
-                html.Div([
-                    html.Span("CONFIDENTIAL", className="confidential-stamp")
-                ], className="stamp-container"),
+               
                 
                 html.P(
                     "Select securities with positive forecasts for intelligence gathering:",

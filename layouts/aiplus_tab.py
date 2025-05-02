@@ -39,9 +39,7 @@ def get_layout():
             
             # Single column layout
             html.Div([
-                html.Div([
-                    html.Span("AI+ ANALYSIS", className="confidential-stamp")
-                ], className="stamp-container"),
+              
                 
                 # Stock selection
                 html.Div([
