@@ -18,10 +18,8 @@ from layouts import selection_tab
 from layouts import test_tab 
 from layouts import predict_tab
 from layouts import research_tab
-from layouts import aiplus_tab  # Import the AI+ tab
-from modules import aiplus_callbacks
-
-
+from layouts import aiplus_tab
+from callbacks import aiplus_import # Import AI+ callbacks to register them
 # Load data
 screener_df = load_data(config.INPUT_FILE, [
     'Symbol', 'Name', 'Last Sale', 'Volume', 'Market Cap', 

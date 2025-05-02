@@ -37,224 +37,152 @@ def get_layout():
                 className="bank-text"
             ),
             
-            # AI+ Subtabs
-            dcc.Tabs(
-                id='aiplus-tabs',
-                className='bank-subtabs',
-                value='gather-data',
-                children=[
-                    dcc.Tab(
-                        label='1. Gather Information', 
-                        value='gather-data',
-                        className='bank-subtab',
-                        selected_className='bank-subtab--selected'
+            # Single column layout
+            html.Div([
+                html.Div([
+                    html.Span("AI+ ANALYSIS", className="confidential-stamp")
+                ], className="stamp-container"),
+                
+                # Stock selection
+                html.Div([
+                    html.H6("Data Collection", className="bank-card-subtitle"),
+                    
+                    html.P(
+                        "Select a security for advanced AI analysis:",
+                        className="bank-label"
                     ),
-                    dcc.Tab(
-                        label='2. Think & Predict', 
-                        value='think-predict',
-                        className='bank-subtab',
-                        selected_className='bank-subtab--selected'
+                    dcc.Dropdown(
+                        id='aiplus-stock-dropdown',
+                        placeholder="Select a security to analyze...",
+                        className="bank-dropdown"
                     ),
-                    dcc.Tab(
-                        label='3. Review Performance', 
-                        value='review',
-                        className='bank-subtab',
-                        selected_className='bank-subtab--selected'
-                    )
-                ]
-            ),
-            
-            # Content for the selected subtab
-            html.Div(id='aiplus-subtab-content', className="bank-subtab-content")
-            
+                ], className="bank-section-container"),
+                
+                # Technical Data Parameters
+                html.Div([
+                    html.H6("Technical Data Parameters", className="bank-card-subtitle"),
+                    html.P("Select the timeframe for technical indicator analysis:", className="bank-text"),
+                    dcc.Dropdown(
+                        id='tech-timeframe-dropdown',
+                        options=[
+                            {'label': '1 Month', 'value': '1mo'},
+                            {'label': '3 Months', 'value': '3mo'},
+                            {'label': '6 Months', 'value': '6mo'},
+                            {'label': '1 Year', 'value': '1y'}
+                        ],
+                        value='1mo',
+                        className="bank-dropdown"
+                    ),
+                    
+                    html.Button(
+                        "Fetch Technical Data", 
+                        id='fetch-tech-button', 
+                        n_clicks=0, 
+                        className="bank-button",
+                        style={"marginTop": "15px"}
+                    ),
+                    
+                    html.Div(id='tech-data-status', className="bank-status")
+                ], className="bank-section-container"),
+                
+                # News Data Parameters
+                html.Div([
+                    html.H6("News Data Parameters", className="bank-card-subtitle"),
+                    html.P("Select the timeframe for news sentiment analysis:", className="bank-text"),
+                    dcc.Dropdown(
+                        id='news-timeframe-dropdown',
+                        options=[
+                            {'label': '3 Days', 'value': 3},
+                            {'label': '7 Days', 'value': 7},
+                            {'label': '14 Days', 'value': 14},
+                            {'label': '30 Days', 'value': 30}
+                        ],
+                        value=7,
+                        className="bank-dropdown"
+                    ),
+                    
+                    html.Button(
+                        "Fetch News Data", 
+                        id='fetch-news-button', 
+                        n_clicks=0, 
+                        className="bank-button",
+                        style={"marginTop": "15px"}
+                    ),
+                    
+                    html.Div(id='news-data-status', className="bank-status")
+                ], className="bank-section-container"),
+                
+                # Prediction Parameters
+                html.Div([
+                    html.H6("Prediction Parameters", className="bank-card-subtitle"),
+                    
+                    # Prediction Horizon selection
+                    html.P("Select the timeframe for price prediction:", className="bank-text"),
+                    dcc.Dropdown(
+                        id='prediction-horizon-dropdown',
+                        options=[
+                            {'label': 'Next Day', 'value': '1d'},
+                            {'label': 'Next 2 Days', 'value': '2d'},
+                            {'label': 'Next Week', 'value': '1w'},
+                            {'label': 'Next Month', 'value': '1mo'}
+                        ],
+                        value='1d',
+                        className="bank-dropdown"
+                    ),
+                    
+                    # Prediction Forecast Time
+                    html.P("Select forecast time for predictions:", className="bank-text", style={"marginTop": "15px"}),
+                    dcc.Dropdown(
+                        id='forecast-time-dropdown',
+                        options=[
+                            {'label': 'End of Day', 'value': 'eod'},
+                            {'label': 'End of Week', 'value': 'eow'},
+                            {'label': 'End of Month', 'value': 'eom'},
+                            {'label': 'Market Open', 'value': 'open'},
+                            {'label': 'Market Close', 'value': 'close'}
+                        ],
+                        value='close',
+                        className="bank-dropdown"
+                    ),
+                ], className="bank-section-container"),
+                
+                # Data Readiness Status
+                html.Div([
+                    html.H6("Data Readiness Status", className="bank-card-subtitle"),
+                    html.Div(id='data-readiness-status', className="bank-status-large")
+                ], className="bank-section-container"),
+                
+                # Analysis Button
+                html.Div([
+                    html.Button(
+                        "Begin AI Analysis", 
+                        id='begin-analysis-button', 
+                        n_clicks=0, 
+                        className="bank-button bank-button-large",
+                        style={"marginTop": "15px", "marginBottom": "15px"}
+                    ),
+                ], className="bank-section-container", style={"textAlign": "center"}),
+                
+                # Analysis Results
+                html.Div([
+                    html.H6("Analysis Results", className="bank-card-subtitle"),
+                    
+                    # Loading indicator and analysis output
+                    dcc.Loading(
+                        id="analysis-loading",
+                        type="default",
+                        children=html.Div(id="analysis-output", className="analysis-output-container")
+                    ),
+                ], className="bank-section-container"),
+                
+                # Performance Metrics
+                html.Div([
+                    html.H6("Performance Metrics", className="bank-card-subtitle"),
+                    html.Div(id='performance-metrics', className="performance-container")
+                ], className="bank-section-container"),
+                
+            ], className="bank-combined-view")
         ], className="bank-card"),
     ], id='aiplus-content', className="bank-section")
 
-# Callback to switch between AI+ subtabs
-@callback(
-    Output('aiplus-subtab-content', 'children'),
-    Input('aiplus-tabs', 'value')
-)
-def render_aiplus_subtab(subtab):
-    """Render the content for the selected AI+ subtab."""
-    if subtab == 'gather-data':
-        return render_gather_data_tab()
-    elif subtab == 'think-predict':
-        return render_think_predict_tab()
-    elif subtab == 'review':
-        return render_review_tab()
-    
-    return html.P("Select a tab to continue.", className="bank-text")
-
-def render_gather_data_tab():
-    """Render the Gather Information tab content."""
-    return html.Div([
-        html.Div([
-            html.Span("DATA COLLECTION", className="confidential-stamp")
-        ], className="stamp-container"),
-        
-        # Stock selection
-        html.P(
-            "Select a security for advanced AI analysis:",
-            className="bank-label"
-        ),
-        dcc.Dropdown(
-            id='aiplus-stock-dropdown',
-            placeholder="Select a security to analyze...",
-            className="bank-dropdown"
-        ),
-        
-        # Data range selectors
-        html.Div([
-            html.Div([
-                html.H6("Technical Data Parameters", className="bank-card-subtitle"),
-                html.P("Select the timeframe for technical indicator analysis:", className="bank-text"),
-                dcc.Dropdown(
-                    id='tech-timeframe-dropdown',
-                    options=[
-                        {'label': '1 Month', 'value': '1mo'},
-                        {'label': '3 Months', 'value': '3mo'},
-                        {'label': '6 Months', 'value': '6mo'},
-                        {'label': '1 Year', 'value': '1y'}
-                    ],
-                    value='1mo',
-                    className="bank-dropdown"
-                ),
-                
-                html.Button(
-                    "Fetch Technical Data", 
-                    id='fetch-tech-button', 
-                    n_clicks=0, 
-                    className="bank-button",
-                    style={"marginTop": "15px"}
-                ),
-                
-                html.Div(id='tech-data-status', className="bank-status")
-            ], className="bank-card-half"),
-            
-            html.Div([
-                html.H6("News Data Parameters", className="bank-card-subtitle"),
-                html.P("Select the timeframe for news sentiment analysis:", className="bank-text"),
-                dcc.Dropdown(
-                    id='news-timeframe-dropdown',
-                    options=[
-                        {'label': '3 Days', 'value': 3},
-                        {'label': '7 Days', 'value': 7},
-                        {'label': '14 Days', 'value': 14},
-                        {'label': '30 Days', 'value': 30}
-                    ],
-                    value=7,
-                    className="bank-dropdown"
-                ),
-                
-                html.Button(
-                    "Fetch News Data", 
-                    id='fetch-news-button', 
-                    n_clicks=0, 
-                    className="bank-button",
-                    style={"marginTop": "15px"}
-                ),
-                
-                html.Div(id='news-data-status', className="bank-status")
-            ], className="bank-card-half")
-        ], className="bank-card-row"),
-        
-        # Prediction Horizon selection
-        html.Div([
-            html.H6("Prediction Horizon", className="bank-card-subtitle"),
-            html.P("Select the timeframe for price prediction:", className="bank-text"),
-            dcc.Dropdown(
-                id='prediction-horizon-dropdown',
-                options=[
-                    {'label': 'Next Day', 'value': '1d'},
-                    {'label': 'Next 2 Days', 'value': '2d'},
-                    {'label': 'Next Week', 'value': '1w'},
-                    {'label': 'Next Month', 'value': '1mo'}
-                ],
-                value='1d',
-                className="bank-dropdown"
-            ),
-        ], className="bank-form-group"),
-        
-        # Overall status
-        html.Div([
-            html.H6("Data Readiness Status", className="bank-card-subtitle"),
-            html.Div(id='data-readiness-status', className="bank-status-large")
-        ], className="bank-card-footer"),
-        
-    ], className="gather-data-container")
-
-def render_think_predict_tab():
-    """Render the Think & Predict tab content."""
-    return html.Div([
-        html.Div([
-            html.Span("AI ANALYSIS", className="confidential-stamp")
-        ], className="stamp-container"),
-        
-        html.P(
-            "Generate an advanced AI prediction using both technical and news data:",
-            className="bank-label"
-        ),
-        
-        html.Button(
-            "Begin AI Analysis", 
-            id='begin-analysis-button', 
-            n_clicks=0, 
-            className="bank-button bank-button-large"
-        ),
-        
-        # Loading indicator
-        dcc.Loading(
-            id="analysis-loading",
-            type="default",
-            children=html.Div(id="analysis-output")
-        )
-    ], className="think-predict-container")
-
-def render_review_tab():
-    """Render the Review Performance tab content."""
-    return html.Div([
-        html.Div([
-            html.Span("PERFORMANCE REVIEW", className="confidential-stamp")
-        ], className="stamp-container"),
-        
-        html.P(
-            "Historical Prediction Performance:",
-            className="bank-label"
-        ),
-        
-        # Placeholder for performance metrics
-        html.Div(id='performance-metrics', className="performance-container")
-    ], className="review-container")
-
-# Additional callbacks for AI+ functionality
-@callback(
-    Output('aiplus-stock-dropdown', 'options'),
-    Input('tabs', 'value')
-)
-def populate_aiplus_dropdown(tab):
-    """Populate the stock dropdown for AI+ analysis."""
-    if tab != 'aiplus':
-        return []
-    
-    try:
-        # Load all available stocks
-        symbols_file = config.OUTPUT_FILE
-        if not os.path.exists(symbols_file):
-            return []
-        
-        symbols_df = pd.read_csv(symbols_file)
-        
-        # Create dropdown options
-        options = [
-            {
-                'label': symbol,
-                'value': symbol
-            }
-            for symbol in symbols_df['Symbol'].tolist()
-        ]
-        
-        return options
-    except Exception as e:
-        print(f"Error loading symbols: {e}")
-        return []
+# No callback is needed here since it's handled elsewhere in the app
