@@ -183,4 +183,41 @@ def get_layout():
         ], className="bank-card"),
     ], id='aiplus-content', className="bank-section")
 
-# No callback is needed here since it's handled elsewhere in the app
+
+# Temporary callback to populate the dropdown directly in this file
+@callback(
+    Output('aiplus-stock-dropdown', 'options', allow_duplicate=True),
+    Input('tabs', 'value'),
+    prevent_initial_call=True
+)
+def populate_aiplus_dropdown_direct(tab):
+    """
+    Direct callback to populate the AI+ stock dropdown.
+    This is a temporary solution to bypass the modular callback system.
+    """
+    print(f"Direct AI+ dropdown callback triggered with tab = '{tab}'")
+    
+    if tab != 'aiplus':
+        return []
+    
+    try:
+        # Load stock symbols
+        symbols_file = config.OUTPUT_FILE
+        if not os.path.exists(symbols_file):
+            print(f"Symbols file does not exist: {symbols_file}")
+            return []
+        
+        print(f"Loading symbols from: {symbols_file}")
+        symbols_df = pd.read_csv(symbols_file)
+        
+        # Create dropdown options
+        options = [
+            {'label': symbol, 'value': symbol}
+            for symbol in symbols_df['Symbol'].tolist() if symbol
+        ]
+        
+        print(f"Loaded {len(options)} options for AI+ dropdown")
+        return options
+    except Exception as e:
+        print(f"Error in direct AI+ dropdown callback: {str(e)}")
+        return []

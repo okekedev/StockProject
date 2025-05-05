@@ -6,6 +6,8 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, curren
 from dotenv import load_dotenv
 import config
 from werkzeug.security import check_password_hash, generate_password_hash
+# Before you set up routes or layouts
+import callbacks.aiplus_import
 
 # Load environment variables
 load_dotenv()

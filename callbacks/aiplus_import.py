@@ -1,12 +1,13 @@
 """
-Central import file for AI+ callbacks.
-
-This file ensures all AI+ callbacks are imported and registered
-when the application starts up. Import this file in main.py.
+Import all AI+ callbacks
 """
+print("Loading AI+ callbacks...")
 
-# Import callback modules to ensure all are registered
-from callbacks.aiplus.data_callbacks import fetch_technical_data, fetch_news_data, populate_aiplus_dropdown
-from callbacks.aiplus.status_callbacks import update_readiness_status, update_data_readiness
-from callbacks.aiplus.analysis_callbacks import generate_ai_analysis
-from callbacks.aiplus.metrics_callbacks import update_performance_metrics
+# Import all AI+ callback modules
+from callbacks.aiplus import data_callbacks
+from callbacks.aiplus import analysis_callbacks  
+from callbacks.aiplus import metrics_callbacks
+from callbacks.aiplus import status_callbacks
+from callbacks.aiplus import utils
+
+print("AI+ callbacks loaded successfully")
