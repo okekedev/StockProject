@@ -277,4 +277,5 @@ app.index_string = '''
 
 # Run the app
 if __name__ == '__main__':
-    app.run(debug=True)
+    # For local development
+    app.run_server(debug=True, host='0.0.0.0')
