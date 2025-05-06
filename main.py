@@ -97,7 +97,13 @@ def get_protected_layout():
         html.Div([
             # Navigation Tabs
             dcc.Tabs([
-                dcc.Tab(label='Download', value='download', className="bank-tab", selected_className="bank-tab--selected"),
+                dcc.Tab(
+                    label='Download', 
+                    value='download', 
+                    className="bank-tab disabled-tab", 
+                    selected_className="bank-tab--selected",
+                    disabled=True  # This disables the tab
+                ),
                 dcc.Tab(label='Screener', value='selection', className="bank-tab", selected_className="bank-tab--selected"),
                 dcc.Tab(label='Fetch Data', value='technical', className="bank-tab", selected_className="bank-tab--selected"),
                 dcc.Tab(label='Test', value='test', className="bank-tab", selected_className="bank-tab--selected"),
@@ -109,7 +115,7 @@ def get_protected_layout():
                     className="bank-tab", 
                     selected_className="bank-tab--selected"
                 )
-            ], value='download', id='tabs', className="bank-tabs"),
+            ], value='selection', id='tabs', className="bank-tabs"),
             
             # Tab content containers with bank theme styling
             html.Div([
@@ -218,7 +224,7 @@ app.index_string = '''
 <html>
     <head>
         {%metas%}
-        <title>Stock Analysis Dashboard</title>
+        <title>Sundai Stocks</title>
         {%favicon%}
         {%css%}
         <style>
@@ -262,6 +268,13 @@ app.index_string = '''
             .bank-logout-button:hover {
                 background-color: #7a2b2b;
             }
+            .disabled-tab {
+                opacity: 0.5;
+                cursor: not-allowed;
+                pointer-events: none;
+                color: #888;
+                border-bottom: 1px solid #ddd;
+            }
         </style>
     </head>
     <body>
@@ -278,4 +291,4 @@ app.index_string = '''
 # Run the app
 if __name__ == '__main__':
     # For local development
-    app.run_server(debug=True, host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0')
