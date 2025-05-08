@@ -1,12 +1,12 @@
 """
-Utility functions for AI+ callbacks.
+Utility functions for AI+ callbacks with local storage.
 """
 from dash import html
 import os
 import json
 import config
 
-# Constants
+# Constants - ensure the cache directory is within the user's data directory
 AIPLUS_CACHE_DIR = os.path.join(config.DATA_DIR, "aiplus_cache")
 os.makedirs(AIPLUS_CACHE_DIR, exist_ok=True)
 
@@ -103,7 +103,7 @@ def get_horizon_display(horizon):
 # Function to save data to cache
 def save_to_cache(filename, data):
     """
-    Save data to the cache directory.
+    Save data to the local cache directory.
     
     Args:
         filename (str): Cache filename
@@ -113,6 +113,9 @@ def save_to_cache(filename, data):
         bool: Success status
     """
     try:
+        # Ensure cache directory exists
+        os.makedirs(AIPLUS_CACHE_DIR, exist_ok=True)
+        
         filepath = os.path.join(AIPLUS_CACHE_DIR, filename)
         with open(filepath, 'w') as f:
             json.dump(data, f)
@@ -125,7 +128,7 @@ def save_to_cache(filename, data):
 # Function to load data from cache
 def load_from_cache(filename):
     """
-    Load data from the cache directory.
+    Load data from the local cache directory.
     
     Args:
         filename (str): Cache filename

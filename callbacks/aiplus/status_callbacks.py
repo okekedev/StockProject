@@ -1,10 +1,11 @@
 """
-Status update callbacks for the AI+ tab.
+Status update callbacks for the AI+ tab with local storage.
 """
 from dash import html, callback, Output, Input
 import os
+import json
 import pandas as pd
-from callbacks.aiplus.utils import AIPLUS_CACHE_DIR, save_to_cache, load_from_cache
+import config
 
 
 def update_data_readiness(symbol):
@@ -15,14 +16,21 @@ def update_data_readiness(symbol):
         symbol (str): Stock symbol
     """
     try:
-        # Check if both technical and news data are available
-        tech_file = os.path.join(AIPLUS_CACHE_DIR, f"{symbol}_tech.json")
-        news_file = os.path.join(AIPLUS_CACHE_DIR, f"{symbol}_news.json")
+        # Ensure the cache directory exists
+        aiplus_cache_dir = os.path.join(config.DATA_DIR, "aiplus_cache")
+        os.makedirs(aiplus_cache_dir, exist_ok=True)
+        
+        # Check if both technical and news data are available locally
+        tech_file = os.path.join(aiplus_cache_dir, f"{symbol}_tech.json")
+        news_file = os.path.join(aiplus_cache_dir, f"{symbol}_news.json")
         
         tech_ready = os.path.exists(tech_file)
         news_ready = os.path.exists(news_file)
         
-        # Update global readiness state
+        # Create readiness state file
+        readiness_file = os.path.join(aiplus_cache_dir, "readiness.json")
+        
+        # Update readiness state
         if tech_ready and news_ready:
             readiness_state = {
                 "ready": True,
@@ -40,8 +48,9 @@ def update_data_readiness(symbol):
                 "timestamp": pd.Timestamp.now().isoformat()
             }
             
-        # Save readiness state
-        save_to_cache("readiness.json", readiness_state)
+        # Save readiness state to local storage
+        with open(readiness_file, 'w') as f:
+            json.dump(readiness_state, f)
             
     except Exception as e:
         print(f"Error updating data readiness: {e}")
@@ -71,23 +80,33 @@ def update_readiness_status(tech_status, news_status, symbol):
         return html.P("Select a stock symbol and fetch data to begin.", className="bank-text"), "bank-status-large"
     
     try:
-        # Try to load readiness state
-        readiness = load_from_cache("readiness.json")
+        # Set up paths for cache files
+        aiplus_cache_dir = os.path.join(config.DATA_DIR, "aiplus_cache")
+        os.makedirs(aiplus_cache_dir, exist_ok=True)
         
-        if readiness:
+        readiness_file = os.path.join(aiplus_cache_dir, "readiness.json")
+        
+        # Try to load readiness state from local file
+        if os.path.exists(readiness_file):
+            with open(readiness_file, 'r') as f:
+                readiness = json.load(f)
+                
             # Check if readiness is for current symbol
             if readiness.get('symbol') != symbol:
                 # Different symbol, check data files
-                tech_file = os.path.join(AIPLUS_CACHE_DIR, f"{symbol}_tech.json")
-                news_file = os.path.join(AIPLUS_CACHE_DIR, f"{symbol}_news.json")
+                tech_file = os.path.join(aiplus_cache_dir, f"{symbol}_tech.json")
+                news_file = os.path.join(aiplus_cache_dir, f"{symbol}_news.json")
                 
                 tech_ready = os.path.exists(tech_file)
                 news_ready = os.path.exists(news_file)
                 
+                # Update readiness status for the new symbol
+                update_data_readiness(symbol)
+                
                 if tech_ready and news_ready:
                     return html.Div([
                         html.P("All data ready for AI analysis!", className="bank-success"),
-                        html.P(f"Technical and news data available for {symbol}. You can now proceed to the 'Think & Predict' tab.", className="bank-text")
+                        html.P(f"Technical and news data available for {symbol}. You can now proceed with AI analysis.", className="bank-text")
                     ]), "bank-status-large status-ready"
                 elif tech_ready:
                     return html.Div([
@@ -109,7 +128,7 @@ def update_readiness_status(tech_status, news_status, symbol):
             if readiness.get('ready', False):
                 return html.Div([
                     html.P("All data ready for AI analysis!", className="bank-success"),
-                    html.P(f"Technical and news data available for {symbol}. You can now proceed to the 'Think & Predict' tab.", className="bank-text")
+                    html.P(f"Technical and news data available for {symbol}. You can now proceed with AI analysis.", className="bank-text")
                 ]), "bank-status-large status-ready"
             else:
                 # Not ready, show what's missing
@@ -133,10 +152,36 @@ def update_readiness_status(tech_status, news_status, symbol):
                     ]), "bank-status-large status-pending"
         else:
             # No readiness file yet
-            return html.Div([
-                html.P("Data collection required.", className="bank-warning"),
-                html.P(f"Please fetch both technical and news data for {symbol} to proceed with AI analysis.", className="bank-text")
-            ]), "bank-status-large status-pending"
+            # Check if the files exist directly
+            tech_file = os.path.join(aiplus_cache_dir, f"{symbol}_tech.json")
+            news_file = os.path.join(aiplus_cache_dir, f"{symbol}_news.json")
+            
+            tech_ready = os.path.exists(tech_file)
+            news_ready = os.path.exists(news_file)
+            
+            # Create an initial readiness file
+            update_data_readiness(symbol)
+            
+            if tech_ready and news_ready:
+                return html.Div([
+                    html.P("All data ready for AI analysis!", className="bank-success"),
+                    html.P(f"Technical and news data available for {symbol}. You can now proceed with AI analysis.", className="bank-text")
+                ]), "bank-status-large status-ready"
+            elif tech_ready:
+                return html.Div([
+                    html.P("Technical data ready, news data needed.", className="bank-warning"),
+                    html.P(f"Please fetch news data for {symbol} to proceed with AI analysis.", className="bank-text")
+                ]), "bank-status-large status-pending"
+            elif news_ready:
+                return html.Div([
+                    html.P("News data ready, technical data needed.", className="bank-warning"),
+                    html.P(f"Please fetch technical data for {symbol} to proceed with AI analysis.", className="bank-text")
+                ]), "bank-status-large status-pending"
+            else:
+                return html.Div([
+                    html.P("Data collection required.", className="bank-warning"),
+                    html.P(f"Please fetch both technical and news data for {symbol} to proceed with AI analysis.", className="bank-text")
+                ]), "bank-status-large status-pending"
             
     except Exception as e:
         print(f"Error updating readiness status: {e}")
