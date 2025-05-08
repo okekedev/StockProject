@@ -1,8 +1,8 @@
 """
-Enhanced AI+ Predictor Module that leverages Gemini's mathematical expertise
+Enhanced AI+ Predictor Module that leverages Gemini's mathematical expertise with raw data
 
-This module combines technical analysis and news sentiment to generate
-enhanced stock price predictions using advanced AI capabilities.
+This module sends raw stock price and news data to Gemini AI, letting it perform its own
+analysis without being constrained by predetermined indicators or formulas.
 """
 
 import os
@@ -51,8 +51,7 @@ def configure_gemini():
 
 class AIplusPredictor:
     """
-    Class for combining technical and sentiment data to make enhanced predictions
-    using advanced AI capabilities.
+    Class for sending raw technical and sentiment data to advanced AI for prediction.
     """
     
     def __init__(self):
@@ -63,7 +62,7 @@ class AIplusPredictor:
     
     def generate_prediction(self, symbol, technical_timeframe='1mo', news_days=7, prediction_horizon='1d', force_refresh=False):
         """
-        Generate an enhanced stock prediction using both technical and news data with advanced AI analysis.
+        Generate an AI-enhanced stock prediction using raw data.
         
         Args:
             symbol (str): Stock symbol
@@ -128,7 +127,7 @@ class AIplusPredictor:
     
     def _generate_ai_enhanced_prediction(self, symbol, technical_data, sentiment_data, technical_timeframe, prediction_horizon):
         """
-        Use advanced AI to analyze and predict stock movements.
+        Use advanced AI to analyze raw data and predict stock movements.
         
         Args:
             symbol (str): Stock symbol
@@ -147,17 +146,9 @@ class AIplusPredictor:
         try:
             # Extract key data for the prompt
             current_price = technical_data.get('current_price', 0)
-            price_change = technical_data.get('price_change_pct', 0)
-            volatility = technical_data.get('volatility', 0)
-            
-            # Get technical indicators
-            indicators = technical_data.get('standard_indicators', {})
-            tsmn = technical_data.get('tsmn', {})
-            tsmn_value = tsmn.get('value', 0) if isinstance(tsmn, dict) else 0
-            
-            # Get sentiment data
-            sentiment = sentiment_data.get('sentiment', 'neutral')
-            sentiment_score = sentiment_data.get('sentiment_score', 0)
+            company_name = technical_data.get('company_name', symbol)
+            sector = technical_data.get('sector', 'Unknown')
+            industry = technical_data.get('industry', 'Unknown')
             
             # Format timeframes for AI prompt
             ai_timeframe = {
@@ -169,94 +160,127 @@ class AIplusPredictor:
             
             prediction_horizon_text = PREDICTION_HORIZON_TEXT.get(prediction_horizon, 'specified period')
             
-            # Create prompt for Gemini with raw technical and sentiment data
+            # Get raw price data
+            price_data = technical_data.get('price_data', {})
+            volume_data = technical_data.get('volume_data', {})
+            dates = technical_data.get('dates', [])
+            
+            # Extract just a few basic indicators for context
+            basic_indicators = technical_data.get('basic_indicators', {})
+            
+            # Prepare raw data in a format for the AI to analyze
+            # For timeframes up to 3 months, include complete dataset
+            # For longer timeframes, sample representative points
+            price_points = []
+            
+            # Determine if we need to sample (only for long timeframes to manage token limits)
+            use_sampling = len(dates) > 60  # Only sample if more than 60 days of data
+            
+            # Get indices - either all indices or a representative sample for long timeframes
+            indices = self._get_representative_indices(len(dates)) if use_sampling else range(len(dates))
+            
+            for idx in indices:
+                if idx < len(dates):
+                    date_point = dates[idx]
+                    price_point = {
+                        'date': date_point,
+                        'close': price_data.get('close', [])[idx] if idx < len(price_data.get('close', [])) else None,
+                        'open': price_data.get('open', [])[idx] if idx < len(price_data.get('open', [])) else None,
+                        'high': price_data.get('high', [])[idx] if idx < len(price_data.get('high', [])) else None,
+                        'low': price_data.get('low', [])[idx] if idx < len(price_data.get('low', [])) else None,
+                        'volume': volume_data.get('volume', [])[idx] if idx < len(volume_data.get('volume', [])) else None
+                    }
+                    price_points.append(price_point)
+            
+            # Get news data
+            news_items = sentiment_data.get('news_items', [])
+            
+            # Create prompt for Gemini with raw data
             prompt = f"""
             You are an expert financial analyst with deep expertise in quantitative finance, technical analysis, and market psychology.
 
-            Please analyze the following data for {symbol} and provide a detailed price movement prediction for the {prediction_horizon_text}.
+            Please analyze the following data for {company_name} ({symbol}) and provide a detailed price movement prediction for the {prediction_horizon_text}.
 
-            TECHNICAL ANALYSIS DATA:
+            COMPANY INFORMATION:
             - Current Price: ${current_price:.2f}
-            - Price Change ({ai_timeframe}): {price_change:.2f}%
-            - Volatility (annualized): {volatility:.2f}%
-            - TSMN Value: {tsmn_value:.2f}
+            - Sector: {sector}
+            - Industry: {industry}
+            
+            RAW PRICE DATA (SAMPLE POINTS ACROSS {ai_timeframe}):
             """
             
-            # Add technical indicators
-            prompt += "\nTECHNICAL INDICATORS:\n"
-            for indicator, value in indicators.items():
-                prompt += f"- {indicator}: {value}\n"
+            # Add price data points
+            sampling_notice = " (SAMPLED POINTS)" if use_sampling else " (COMPLETE DATASET)"
+            prompt += sampling_notice + "\n"
             
-            # Add more technical data if available
-            if 'price_momentum' in technical_data:
-                prompt += "\nPRICE MOMENTUM:\n"
-                for period, value in technical_data['price_momentum'].items():
-                    prompt += f"- {period}: {value:.2f}%\n"
+            for point in price_points:
+                close_price = point.get('close', 'N/A')
+                open_price = point.get('open', 'N/A')
+                high_price = point.get('high', 'N/A')
+                low_price = point.get('low', 'N/A')
+                
+                prompt += f"- {point['date']}: Open ${open_price}, High ${high_price}, Low ${low_price}, Close ${close_price}"
+                
+                volume = point.get('volume')
+                if volume is not None:
+                    prompt += f", Volume {volume}"
+                    
+                prompt += "\n"
             
-            if 'volume_analysis' in technical_data:
-                prompt += "\nVOLUME ANALYSIS:\n"
-                for metric, value in technical_data['volume_analysis'].items():
-                    prompt += f"- {metric}: {value}\n"
+            # Add a few basic indicators for context
+            if basic_indicators:
+                prompt += "\nBASIC TECHNICAL INDICATORS (FOR CONTEXT):\n"
+                for indicator, value in basic_indicators.items():
+                    prompt += f"- {indicator}: {value}\n"
             
-            if 'pattern_detection' in technical_data:
-                patterns = technical_data['pattern_detection']
-                if isinstance(patterns, dict) and patterns:
-                    prompt += "\nPATTERN DETECTION:\n"
-                    for pattern, data in patterns.items():
-                        if pattern != 'error' and isinstance(data, dict):
-                            if data.get('detected', False):
-                                prompt += f"- {pattern}: Detected with {data.get('confidence', 'unknown')} confidence\n"
+            # Add news data
+            prompt += "\nRECENT NEWS:\n"
+            for i, item in enumerate(news_items[:5]):  # Limit to 5 most recent news items
+                date = item.get('date', 'N/A')
+                headline = item.get('headline', 'No headline available')
+                summary = item.get('summary', 'No summary available')
+                prompt += f"- {date}: {headline}\n  Summary: {summary}\n"
             
-            # Add sentiment data
-            prompt += f"""
-            SENTIMENT ANALYSIS:
-            - Overall Sentiment: {sentiment}
-            - Sentiment Score: {sentiment_score:.2f}
-            """
-            
-            # Add key developments from news
-            key_developments = sentiment_data.get('key_developments', [])
-            if key_developments:
-                prompt += "\nKEY DEVELOPMENTS:\n"
-                for dev in key_developments[:3]:  # Top 3 developments
-                    date = dev.get('date', '')
-                    headline = dev.get('headline', '')
-                    prompt += f"- {date}: {headline}\n"
-            
-            # Add additional context
-            prompt += f"""
+            # Add additional instructions
+            prompt += """
             PREDICTION REQUIREMENTS:
-            1. Provide a detailed price movement prediction for {symbol} for the {prediction_horizon_text} with a percentage change forecast.
-            2. Explain the key factors driving this prediction, detailing how much weight you assign to technical versus sentiment factors.
-            3. Provide a confidence level (high, medium, or low) and explain why.
-            4. Give a specific target price range (low, mid, high) based on your prediction.
-            5. Make a clear investment recommendation (e.g., Strong Buy, Buy, Hold, Sell, etc.) with clear reasoning.
+            1. Analyze the raw price data yourself, applying your expertise in technical analysis and market behavior.
+            2. Consider market context, sector trends, and how news might impact the stock.
+            3. Provide a detailed price movement prediction for this stock for the specified timeframe with a percentage change forecast.
+            4. Explain the key factors driving this prediction, detailing how much weight you assign to technical versus sentiment factors.
+            5. Provide a confidence level (high, medium, or low) and explain why.
+            6. Give a specific target price range (low, mid, high) based on your prediction.
+            7. Make a clear investment recommendation (e.g., Strong Buy, Buy, Hold, Sell, etc.) with clear reasoning.
             
             IMPORTANT ANALYSIS GUIDANCE:
-            - Use your advanced mathematical expertise to analyze the correlations between these indicators.
+            - Perform your own analysis on the raw data rather than relying on predetermined indicators.
+            - Extract patterns, trends, and correlations from the raw price and volume history.
+            - Calculate your own technical indicators if needed (RSI, MACD, Bollinger Bands, etc.).
+            - Identify chart patterns in the data (head and shoulders, double tops/bottoms, etc.).
             - Draw upon your full knowledge of financial markets, recent market conditions, and sector trends.
-            - Integrate both technical signals and sentiment analysis in your prediction.
+            - Integrate both technical patterns and news sentiment in your prediction.
             - Base predictions on probability distributions that account for market volatility.
-            - Consider the specific time horizon ({prediction_horizon_text}) carefully in your analysis.
+            - Consider the specific time horizon for your forecast carefully in your analysis.
             
             Format your response as JSON with these keys:
             {
-                "predicted_change_pct": number,
-                "confidence": "high/medium/low",
-                "target_price_low": number,
-                "target_price_mid": number, 
-                "target_price_high": number,
-                "recommendation": "string",
-                "technical_contribution": {
-                    "weight": number (0-1),
-                    "signal": "bullish/bearish/neutral",
-                    "explanation": "string"
-                },
-                "sentiment_contribution": {
-                    "weight": number (0-1),
-                    "explanation": "string"
-                },
-                "enhanced_analysis": "string (2-3 paragraphs of detailed analysis)"
+              "predicted_change_pct": number,
+              "confidence": "high/medium/low",
+              "target_price_low": number,
+              "target_price_mid": number, 
+              "target_price_high": number,
+              "recommendation": "string",
+              "technical_contribution": {
+                "weight": number,
+                "signal": "bullish/bearish/neutral",
+                "explanation": "string",
+                "patterns_identified": ["string"]
+              },
+              "sentiment_contribution": {
+                "weight": number,
+                "explanation": "string"
+              },
+              "enhanced_analysis": "string (2-3 paragraphs of detailed analysis)"
             }
             """
             
@@ -298,7 +322,7 @@ class AIplusPredictor:
             # Compile final prediction
             prediction = {
                 "symbol": symbol,
-                "company_name": technical_data.get('company_name', sentiment_data.get('company_name', symbol)),
+                "company_name": company_name,
                 "current_price": current_price,
                 "timestamp": datetime.now().isoformat(),
                 "prediction": {
@@ -317,19 +341,15 @@ class AIplusPredictor:
                     "weight": ai_result.get('technical_contribution', {}).get('weight', 0.6),
                     "signal": ai_result.get('technical_contribution', {}).get('signal', signal),
                     "explanation": ai_result.get('technical_contribution', {}).get('explanation', ''),
-                    "key_indicators": technical_data.get('standard_indicators', {})
+                    "patterns_identified": ai_result.get('technical_contribution', {}).get('patterns_identified', []),
+                    "basic_indicators": basic_indicators
                 },
                 "sentiment_contribution": {
                     "weight": ai_result.get('sentiment_contribution', {}).get('weight', 0.4),
-                    "sentiment": sentiment,
-                    "sentiment_score": sentiment_score,
                     "explanation": ai_result.get('sentiment_contribution', {}).get('explanation', ''),
-                    "key_developments": sentiment_data.get('key_developments', []),
-                    "sentiment_drivers": sentiment_data.get('sentiment_drivers', [])
+                    "news_items": news_items[:5]  # Include top 5 news items
                 },
                 "analysis": {
-                    "technical_summary": technical_data.get('technical_summary', ''),
-                    "sentiment_summary": sentiment_data.get('sentiment_summary', ''),
                     "enhanced_analysis": ai_result.get('enhanced_analysis', '')
                 }
             }
@@ -341,9 +361,38 @@ class AIplusPredictor:
             # Fall back to simpler prediction method
             return self._generate_simple_prediction(symbol, technical_data, sentiment_data, technical_timeframe, prediction_horizon)
     
+    def _get_representative_indices(self, length):
+        """
+        Get representative indices to sample data points.
+        Includes first, last, and evenly spaced points in between.
+        
+        Args:
+            length (int): Length of the array
+            
+        Returns:
+            list: Indices to sample
+        """
+        if length <= 10:
+            return list(range(length))
+        
+        # Always include first and last points
+        indices = [0, length-1]
+        
+        # Add some evenly spaced points in between
+        num_points = 8  # 8 points + first + last = 10 total
+        step = length // (num_points + 1)
+        
+        for i in range(1, num_points + 1):
+            idx = i * step
+            if idx < length - 1:  # Avoid duplicating the last point
+                indices.append(idx)
+        
+        return sorted(indices)
+    
     def _generate_simple_prediction(self, symbol, technical_data, sentiment_data, technical_timeframe, prediction_horizon):
         """
-        Generate a simplified prediction using weighted approach when AI is unavailable.
+        Generate a simplified prediction as fallback when AI is unavailable.
+        This is a very basic implementation that should be used only when the primary AI method fails.
         
         Args:
             symbol (str): Stock symbol
@@ -358,77 +407,77 @@ class AIplusPredictor:
         # Extract technical signals
         current_price = technical_data.get('current_price', 0)
         price_change = technical_data.get('price_change_pct', 0)
-        tsmn = technical_data.get('tsmn', {})
-        tsmn_value = tsmn.get('value', 0) if isinstance(tsmn, dict) else 0
-        technical_indicators = technical_data.get('standard_indicators', {})
-        
-        # Extract sentiment signals
-        sentiment = sentiment_data.get('sentiment', 'neutral')
-        sentiment_score = sentiment_data.get('sentiment_score', 0)
-        
-        # Technical weighting (higher during high volatility periods)
         volatility = technical_data.get('volatility', 20)
-        tech_weight = min(max(0.6, volatility / 50), 0.8)  # 0.6-0.8 range based on volatility
+        basic_indicators = technical_data.get('basic_indicators', {})
         
-        # Sentiment weighting (inversely related to technical weight)
-        sent_weight = 1 - tech_weight
-        
-        # Calculate combined signal (-100 to +100 scale)
-        combined_signal = (tsmn_value * tech_weight) + (sentiment_score * sent_weight)
-        
-        # Normalize to percent change range based on volatility and prediction horizon
-        if prediction_horizon == '1d':
-            # For 1-day prediction, use a smaller fraction of volatility
-            max_move = volatility / 30  # e.g., 30% volatility -> 1% max daily move
-        elif prediction_horizon == '2d':
-            # For 2-day prediction, slightly larger
-            max_move = volatility / 25  # e.g., 30% volatility -> 1.2% max 2-day move
-        elif prediction_horizon == '1w':
-            # For 1-week prediction, larger
-            max_move = volatility / 15  # e.g., 30% volatility -> 2% max weekly move
-        else:
-            # Original scaling for monthly timeframes
-            max_move = volatility / 10  # e.g., 30% volatility -> 3% max move
-            
-        predicted_change_pct = combined_signal * max_move / 100
-        
-        # Calculate confidence level based on signal consensus
-        tech_signal = 1 if tsmn_value > 0 else -1 if tsmn_value < 0 else 0
-        sent_signal = 1 if sentiment_score > 0 else -1 if sentiment_score < 0 else 0
-        
-        confidence = "low"
-        if tech_signal == sent_signal and tech_signal != 0:
-            # Both signals agree and aren't neutral
-            confidence = "high" if abs(combined_signal) > 40 else "medium"
-        elif tech_signal != 0 and sent_signal != 0:
-            # Both signals are non-neutral but disagree
-            confidence = "low"
-        else:
-            # One or both signals are neutral
-            non_neutral_signal = tech_signal if tech_signal != 0 else sent_signal
-            confidence = "medium" if abs(combined_signal) > 40 else "low"
-        
-        # Generate prediction recommendation
-        if predicted_change_pct > 3:
-            recommendation = "Strong Buy" if confidence == "high" else "Buy"
-        elif predicted_change_pct > 1:
-            recommendation = "Buy" if confidence == "high" else "Accumulate"
-        elif predicted_change_pct > 0:
-            recommendation = "Hold with Positive Bias"
-        elif predicted_change_pct > -1:
-            recommendation = "Hold"
-        elif predicted_change_pct > -3:
-            recommendation = "Hold with Negative Bias" if confidence != "high" else "Reduce"
-        else:
-            recommendation = "Sell" if confidence == "high" else "Reduce"
-        
-        # Calculate target prices
-        target_low = current_price * (1 + (predicted_change_pct - (volatility / 30)) / 100)
-        target_high = current_price * (1 + (predicted_change_pct + (volatility / 30)) / 100)
-        target_mid = current_price * (1 + predicted_change_pct / 100)
+        # Get RSI if available
+        rsi = basic_indicators.get('RSI_14', 50)
         
         # Get prediction horizon text for display
         prediction_horizon_text = PREDICTION_HORIZON_TEXT.get(prediction_horizon, 'specified period')
+        
+        # Extract news data
+        news_items = sentiment_data.get('news_items', [])
+        
+        # Simple heuristic for price direction
+        # - If price has been rising and RSI < 70, likely to continue
+        # - If price has been falling and RSI > 30, likely to continue
+        # - If price rising and RSI > 70, potential reversal (overbought)
+        # - If price falling and RSI < 30, potential reversal (oversold)
+        predicted_change_pct = 0
+        confidence = "low"
+        signal = "neutral"
+        
+        if price_change > 0 and rsi < 70:
+            # Uptrend likely to continue
+            predicted_change_pct = min(price_change * 0.5, volatility * 0.25)
+            confidence = "medium"
+            signal = "bullish"
+        elif price_change < 0 and rsi > 30:
+            # Downtrend likely to continue
+            predicted_change_pct = max(price_change * 0.5, -volatility * 0.25)
+            confidence = "medium"
+            signal = "bearish"
+        elif price_change > 0 and rsi > 70:
+            # Potential reversal from overbought
+            predicted_change_pct = -volatility * 0.2
+            confidence = "low"
+            signal = "bearish"
+        elif price_change < 0 and rsi < 30:
+            # Potential reversal from oversold
+            predicted_change_pct = volatility * 0.2
+            confidence = "low"
+            signal = "bullish"
+        else:
+            # Neutral case
+            predicted_change_pct = price_change * 0.1
+            confidence = "low"
+            signal = "neutral"
+        
+        # Adjust for timeframe
+        if prediction_horizon == '2d':
+            predicted_change_pct *= 1.5
+        elif prediction_horizon == '1w':
+            predicted_change_pct *= 3
+        elif prediction_horizon == '1mo':
+            predicted_change_pct *= 5
+        
+        # Generate recommendation
+        if predicted_change_pct > 3:
+            recommendation = "Buy"
+        elif predicted_change_pct > 1:
+            recommendation = "Accumulate"
+        elif predicted_change_pct > -1:
+            recommendation = "Hold"
+        elif predicted_change_pct > -3:
+            recommendation = "Reduce"
+        else:
+            recommendation = "Sell"
+        
+        # Calculate target prices
+        target_mid = current_price * (1 + predicted_change_pct / 100)
+        target_low = current_price * (1 + (predicted_change_pct - volatility * 0.2) / 100)
+        target_high = current_price * (1 + (predicted_change_pct + volatility * 0.2) / 100)
         
         # Compile final prediction
         prediction = {
@@ -437,7 +486,7 @@ class AIplusPredictor:
             "current_price": current_price,
             "timestamp": datetime.now().isoformat(),
             "prediction": {
-                "signal": "bullish" if predicted_change_pct > 0 else "bearish" if predicted_change_pct < 0 else "neutral",
+                "signal": signal,
                 "predicted_change_pct": predicted_change_pct,
                 "confidence": confidence,
                 "target_price_low": target_low,
@@ -449,105 +498,23 @@ class AIplusPredictor:
                 "recommendation": recommendation
             },
             "technical_contribution": {
-                "weight": tech_weight,
-                "signal": "bullish" if tsmn_value > 0 else "bearish" if tsmn_value < 0 else "neutral",
-                "tsmn_value": tsmn_value,
-                "key_indicators": self._extract_key_indicators(technical_indicators)
+                "weight": 0.8,
+                "signal": signal,
+                "explanation": "Basic technical analysis suggests a " + signal + " outlook based on recent price action and RSI.",
+                "patterns_identified": [],
+                "basic_indicators": basic_indicators
             },
             "sentiment_contribution": {
-                "weight": sent_weight,
-                "sentiment": sentiment,
-                "sentiment_score": sentiment_score,
-                "key_developments": sentiment_data.get('key_developments', []),
-                "sentiment_drivers": sentiment_data.get('sentiment_drivers', [])
+                "weight": 0.2,
+                "explanation": "Limited news sentiment analysis included in this fallback prediction.",
+                "news_items": news_items[:3]  # Include top 3 news items
             },
             "analysis": {
-                "technical_summary": technical_data.get('technical_summary', ''),
-                "sentiment_summary": sentiment_data.get('sentiment_summary', ''),
-                "enhanced_analysis": self._generate_fallback_analysis(symbol, technical_data, sentiment_data, predicted_change_pct, confidence, prediction_horizon)
+                "enhanced_analysis": f"This is a fallback prediction generated using basic heuristics since AI analysis was unavailable. The {signal} outlook is based primarily on the recent price movement of {price_change:.2f}% and current RSI of {rsi:.1f}. Given the {prediction_horizon_text} timeframe, we estimate a {predicted_change_pct:.2f}% move with {confidence} confidence."
             }
         }
         
         return prediction
-    
-    def _extract_key_indicators(self, indicators):
-        """
-        Extract the most important technical indicators.
-        
-        Args:
-            indicators (dict): All technical indicators
-            
-        Returns:
-            dict: Key indicators
-        """
-        key_indicators = {}
-        
-        # RSI
-        if 'RSI_14' in indicators:
-            key_indicators['RSI_14'] = indicators['RSI_14']
-        
-        # MACD
-        if 'MACD' in indicators and 'MACD_Signal' in indicators:
-            key_indicators['MACD'] = indicators['MACD']
-            key_indicators['MACD_Signal'] = indicators['MACD_Signal']
-        
-        # Bollinger Bands
-        if 'BB_Percent' in indicators:
-            key_indicators['BB_Percent'] = indicators['BB_Percent']
-        
-        # ADX (trend strength)
-        if 'ADX' in indicators:
-            key_indicators['ADX'] = indicators['ADX']
-        
-        # Moving Averages
-        for ma in ['MA_20', 'MA_50', 'MA_200']:
-            if ma in indicators:
-                key_indicators[ma] = indicators[ma]
-        
-        return key_indicators
-    
-    def _generate_fallback_analysis(self, symbol, technical_data, sentiment_data, predicted_change_pct, confidence, prediction_horizon):
-        """
-        Generate a fallback analysis when AI service is not available.
-        
-        Args:
-            symbol (str): Stock symbol
-            technical_data (dict): Technical analysis data
-            sentiment_data (dict): Sentiment analysis data
-            predicted_change_pct (float): Predicted percentage change
-            confidence (str): Confidence level
-            prediction_horizon (str): Timeframe for prediction
-            
-        Returns:
-            str: Fallback analysis
-        """
-        # Get prediction horizon text for display
-        prediction_horizon_text = PREDICTION_HORIZON_TEXT.get(prediction_horizon, 'specified period')
-        
-        # Get technical and sentiment summaries
-        tech_summary = technical_data.get('technical_summary', '')
-        sent_summary = sentiment_data.get('sentiment_summary', '')
-        
-        # Create fallback analysis
-        fallback_analysis = f"Based on our combined technical and sentiment analysis, we anticipate a {predicted_change_pct:.2f}% move for {symbol} in the {prediction_horizon_text}. "
-        
-        if predicted_change_pct > 0:
-            fallback_analysis += "The positive outlook is "
-        elif predicted_change_pct < 0:
-            fallback_analysis += "The negative outlook is "
-        else:
-            fallback_analysis += "The neutral outlook is "
-        
-        fallback_analysis += f"supported with {confidence} confidence based on the correlation between technical indicators and sentiment analysis. "
-        
-        # Add technical and sentiment context
-        if tech_summary:
-            fallback_analysis += f"From a technical perspective, {tech_summary} "
-        
-        if sent_summary:
-            fallback_analysis += f"Sentiment analysis reveals that {sent_summary}"
-        
-        return fallback_analysis
     
     def track_prediction_performance(self, symbol, prediction_data, actual_price, prediction_horizon='1d'):
         """
