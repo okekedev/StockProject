@@ -479,3 +479,38 @@
         padding: 1rem;
     }
 }
+
+/**
+ * Updated AI+ Styles
+ * This CSS will improve the recommendation text color and remove the performance metrics section styling
+ */
+
+/* Change the recommendation text color for better contrast on dark background */
+.prediction-recommendation {
+    text-align: center;
+    padding: 1rem;
+    background-color: var(--bank-green-light);
+    color: white; /* Changed from the default dark color to white for better contrast */
+    font-weight: 700;
+    font-size: 1.3rem;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px var(--bank-shadow);
+}
+
+/* Hide the performance metrics section */
+.bank-metrics-container {
+    display: none !important; /* Hide the entire metrics container */
+}
+
+/* Alternative styling if you prefer to keep the recommendation box but with better contrast */
+.bank-recommendation.positive {
+    color: white !important; /* Force white color for positive recommendations */
+}
+
+.bank-recommendation.negative {
+    color: white !important; /* Force white color for negative recommendations */
+}
+
+.bank-recommendation.neutral {
+    color: white !important; /* Force white color for neutral recommendations */
+}
