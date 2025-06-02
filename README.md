@@ -1,3 +1,6 @@
+![image](https://github.com/user-attachments/assets/356f5b27-beb9-438f-bc86-8a007dd56d8a)
+
+
 # Sundai Stocks
 
 Sundai Stocks is an advanced stock analysis and prediction platform that combines technical analysis with AI-powered sentiment analysis to provide comprehensive market insights.
