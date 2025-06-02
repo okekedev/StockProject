@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/356f5b27-beb9-438f-bc86-8a007dd56d8a)
+![image](https://github.com/user-attachments/assets/d498c274-c05c-4064-bbc7-8c91d1df0162)
 
 
 # Sundai Stocks
