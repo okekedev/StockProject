@@ -92,18 +92,18 @@ jobs:
       run: |
         echo "🚀 Deploying secure image with runtime secrets..."
         
-        # Update the container app with new image and environment variables
+        # Update using --replace-env-vars with double quotes to fix password hash corruption
         az containerapp update \
           --name stocks \
           --resource-group sundai \
           --image ghcr.io/${{ github.repository_owner }}/sundai-stocks:latest \
-          --set-env-vars \
-            DASH_USERNAME="${{ secrets.DASH_USERNAME }}" \
-            DASH_PASSWORD_HASH="${{ secrets.DASH_PASSWORD_HASH }}" \
-            SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-            GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
-            NEWS_API_KEY="${{ secrets.NEWS_API_KEY }}" \
-            DEBUG="False"
+          --replace-env-vars \
+            "DASH_USERNAME=${{ secrets.DASH_USERNAME }}" \
+            "DASH_PASSWORD_HASH=${{ secrets.DASH_PASSWORD_HASH }}" \
+            "SECRET_KEY=${{ secrets.SECRET_KEY }}" \
+            "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
+            "NEWS_API_KEY=${{ secrets.NEWS_API_KEY }}" \
+            "DEBUG=False"
         
         echo "✅ Deployment completed successfully!"
 
