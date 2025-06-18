@@ -114,7 +114,7 @@ jobs:
         
         # Wait a moment for the deployment to settle
         sleep 30
-        
+      
         # Show the current revision status
         az containerapp revision list \
           --name stocks \
