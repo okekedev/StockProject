@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Auto-Deploy Secure Image
 
 on:
   push:
@@ -9,11 +9,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      id-token: write  # Required for OIDC authentication
 
     steps:
     - name: Checkout code
@@ -45,7 +46,8 @@ jobs:
           type=raw,value=v${{ github.run_number }},enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
           type=raw,value=${{ steps.short_sha.outputs.sha }},enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
 
-    - name: Build and push Docker image
+    # Build secure image with NO SECRETS
+    - name: Build and push secure Docker image
       uses: docker/build-push-action@v4
       with:
         context: .
@@ -55,10 +57,59 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         build-args: |
-          DASH_USERNAME=${{ secrets.DASH_USERNAME || 'sundai' }}
-          DASH_PASSWORD_HASH=${{ secrets.DASH_PASSWORD_HASH || 'scrypt:32768:8:1$ZKCxkyqwu6ECGDP5$0fc9eca9ca1d67df5a514caba195b6842eb36e4a3ba1f7cc5fcbbe1d132200effc50eb067d5e8ffae966dedc2fece75e405cea0d7de0969df20224c5f763ef69' }}
-          SECRET_KEY=${{ secrets.SECRET_KEY || 'b82d1eb7fd57cde0482f0e1da0916546ba453ee1dd6460e7' }}
-          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY || 'AIzaSyCrr6OzYwYvuiorPvmAAkYwb0lHQI8U7Wo' }}
-          NEWS_API_KEY=${{ secrets.NEWS_API_KEY || '9b73205028734f2181dcda4f1b892d66' }}
-          # Explicitly set DEBUG to False for production
           DEBUG=False
+
+    # Login to Azure using your managed identity
+    - name: Azure Login with OIDC
+      if: github.ref == 'refs/heads/main'
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    # Deploy with ONLY secrets - no fallback values exposed
+    - name: Auto-deploy to Azure Container Apps
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "🚀 Deploying secure image with runtime secrets..."
+        
+        # Update container app with new image and environment variables from secrets only
+        az containerapp update \
+          --name stocks \
+          --resource-group sundai \
+          --image ghcr.io/${{ github.repository_owner }}/sundai-stocks:latest \
+          --registry-server ghcr.io \
+          --registry-username ${{ github.actor }} \
+          --registry-password ${{ secrets.GITHUB_TOKEN }} \
+          --set-env-vars \
+            DASH_USERNAME="${{ secrets.DASH_USERNAME }}" \
+            DASH_PASSWORD_HASH="${{ secrets.DASH_PASSWORD_HASH }}" \
+            SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+            GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            NEWS_API_KEY="${{ secrets.NEWS_API_KEY }}" \
+            DEBUG="False"
+
+    # Show successful deployment info
+    - name: Deployment completed
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "✅ Deployment completed successfully!"
+        echo ""
+        echo "🔒 Security Status:"
+        echo "   ✅ Secure image built (no secrets in Docker image)"
+        echo "   ✅ Pushed to GitHub Packages: ghcr.io/okekedev/sundai-stocks:latest"
+        echo "   ✅ Deployed to Azure with runtime environment variables from GitHub Secrets"
+        echo "   ✅ All secrets managed securely - none exposed in workflow"
+        echo ""
+        echo "🌐 Your app is live at:"
+        echo "   https://stocks.grayocean-b61637cb.southcentralus.azurecontainerapps.io"
+        echo ""
+        echo "📊 Latest revision info:"
+        
+        # Show the current active revision
+        az containerapp revision list \
+          --name stocks \
+          --resource-group sundai \
+          --query "[?properties.active].{Name:name,Created:properties.createdTime,Traffic:properties.trafficWeight}" \
+          --output table
