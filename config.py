@@ -36,5 +36,6 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 if not NEWS_API_KEY:
     print("Warning: NEWS_API_KEY environment variable is not set.")
     
+    
 if not GEMINI_API_KEY:
     print("Warning: GEMINI_API_KEY environment variable is not set.")
