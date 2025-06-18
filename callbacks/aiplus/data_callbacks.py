@@ -1,15 +1,15 @@
 """
-Data fetch callbacks for the AI+ tab.
+Data fetch callbacks for the AI+ tab with updated local storage.
 """
 from dash import html, callback, Output, Input, State
 import pandas as pd
 import os
+import json
 import config
 
 # Import modules
 from modules.aiplus_technical import get_aiplus_technical_data
 from modules.aiplus_sentiment import get_aiplus_sentiment
-from callbacks.aiplus.utils import save_to_cache
 from callbacks.aiplus.status_callbacks import update_data_readiness
 
 
@@ -123,14 +123,21 @@ def fetch_technical_data(n_clicks, symbol, timeframe, tab):
             html.P(f"Volatility: {volatility:.1f}%", className="bank-text")
         ])
         
-        # Save data to cache
+        # Save data locally - ensure directory exists
+        aiplus_cache_dir = os.path.join(config.DATA_DIR, "aiplus_cache")
+        os.makedirs(aiplus_cache_dir, exist_ok=True)
+        
+        # Save technical data to local cache
+        tech_cache_file = os.path.join(aiplus_cache_dir, f"{symbol}_tech.json")
         cache_data = {
             "symbol": symbol,
             "timeframe": timeframe,
             "data": technical_data,
             "timestamp": pd.Timestamp.now().isoformat()
         }
-        save_to_cache(f"{symbol}_tech.json", cache_data)
+        
+        with open(tech_cache_file, 'w') as f:
+            json.dump(cache_data, f)
         
         # Check readiness
         update_data_readiness(symbol)
@@ -228,14 +235,21 @@ def fetch_news_data(n_clicks, symbol, days_lookback, tab):
             ]) if key_developments else None
         ])
         
-        # Save data to cache
+        # Save data locally - ensure directory exists
+        aiplus_cache_dir = os.path.join(config.DATA_DIR, "aiplus_cache")
+        os.makedirs(aiplus_cache_dir, exist_ok=True)
+        
+        # Save news data to local cache
+        news_cache_file = os.path.join(aiplus_cache_dir, f"{symbol}_news.json")
         cache_data = {
             "symbol": symbol,
             "days_lookback": days_lookback,
             "data": sentiment_data,
             "timestamp": pd.Timestamp.now().isoformat()
         }
-        save_to_cache(f"{symbol}_news.json", cache_data)
+        
+        with open(news_cache_file, 'w') as f:
+            json.dump(cache_data, f)
         
         # Check readiness
         update_data_readiness(symbol)

@@ -1,10 +1,8 @@
 """
-AI+ Technical Data Module
+Comprehensive Technical Analysis Module with Dynamic Indicator Calculation
 
-This module handles fetching, processing and analyzing technical stock data
-for the AI+ enhanced prediction system. It extends the regular technical
-analysis with additional indicators and features specifically designed
-for machine learning applications.
+This module handles fetching stock data and calculating all technical indicators
+dynamically, ensuring indicators are always available for analysis.
 """
 
 import pandas as pd
@@ -13,724 +11,781 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import os
 import json
-import re
-from scipy import stats
-from sklearn.preprocessing import StandardScaler
 import config
 
 # Constants
 DATA_CACHE_DIR = os.path.join(config.DATA_DIR, "aiplus_cache")
 os.makedirs(DATA_CACHE_DIR, exist_ok=True)
 
-# Function to make data safe for JSON serialization
-def make_json_safe(data):
-    """Recursively convert all values to JSON-safe types."""
-    if isinstance(data, dict):
-        return {k: make_json_safe(v) for k, v in data.items()}
-    elif isinstance(data, list):
-        return [make_json_safe(item) for item in data]
-    elif isinstance(data, tuple):
-        return [make_json_safe(item) for item in data]
-    elif isinstance(data, bool):
-        return int(data)  # Convert bool to int
-    elif isinstance(data, (np.int64, np.int32, np.float64, np.float32)):
-        return float(data) if np.issubdtype(type(data), np.floating) else int(data)
-    elif pd.isna(data) or data is None:
-        return None
-    elif isinstance(data, pd.Timestamp):
-        return data.isoformat()
-    elif isinstance(data, pd.Series):
-        return make_json_safe(data.to_dict())
-    elif isinstance(data, pd.DataFrame):
-        return make_json_safe(data.to_dict(orient='records'))
-    elif isinstance(data, np.ndarray):
-        return make_json_safe(data.tolist())
-    elif hasattr(data, 'tolist'):  # For other numpy arrays and types
-        return make_json_safe(data.tolist())
-    elif not isinstance(data, (str, int, float)):
-        return str(data)  # Convert non-serializable objects to strings
-    return data
-
-# Custom JSON encoder for handling non-serializable types
-class CustomJSONEncoder(json.JSONEncoder):
-    """Custom JSON encoder that handles non-serializable types."""
-    def default(self, obj):
-        if isinstance(obj, bool):
-            return int(obj)  # Convert True to 1, False to 0
-        elif isinstance(obj, (np.int64, np.int32, np.float64, np.float32)):
-            return float(obj) if np.issubdtype(type(obj), np.floating) else int(obj)
-        elif pd.isna(obj) or obj is None:
-            return None
-        elif isinstance(obj, pd.Timestamp):
-            return obj.isoformat()
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif hasattr(obj, 'tolist'):  # For other numpy arrays and types
-            return obj.tolist()
-        elif hasattr(obj, '__dict__'):  # For general objects
-            return {key: value for key, value in obj.__dict__.items() 
-                    if not key.startswith('_')}
-        return str(obj)  # Last resort: convert to string
-
-
-class AIplusTechnicalAnalyzer:
+class TechnicalIndicators:
     """
-    Class for fetching and analyzing technical stock data with enhanced
-    indicators for AI-powered predictions.
+    Class for calculating common technical indicators from price data.
+    These calculations are used as fallbacks when pre-calculated indicators
+    aren't available from the data source.
     """
     
-    def __init__(self):
-        """Initialize the technical analyzer."""
-        self.cache = {}
-        self.indicators = {}
-        self.last_fetch_time = {}
-    
-    def get_technical_data(self, symbol, timeframe='1mo', force_refresh=False):
+    @staticmethod
+    def ensure_dataframe(df):
         """
-        Fetch technical data for a symbol with specified timeframe.
+        Ensures input is a valid DataFrame with required columns.
         
         Args:
-            symbol (str): Stock symbol
-            timeframe (str): Time period - '1mo', '3mo', '6mo', '1y'
-            force_refresh (bool): Whether to force refresh data from source
+            df: Input data that could be a DataFrame or dict
             
         Returns:
-            dict: Technical analysis results
+            pd.DataFrame: Properly formatted DataFrame
         """
-        cache_key = f"{symbol}_{timeframe}"
-        cache_file = os.path.join(DATA_CACHE_DIR, f"{cache_key}.json")
+        if isinstance(df, dict):
+            # Convert price dictionary to DataFrame
+            if 'close' in df and 'dates' in df:
+                price_df = pd.DataFrame({
+                    'Close': df['close'],
+                    'Date': df['dates']
+                })
+                if 'open' in df:
+                    price_df['Open'] = df['open']
+                if 'high' in df:
+                    price_df['High'] = df['high']
+                if 'low' in df:
+                    price_df['Low'] = df['low']
+                if 'volume' in df:
+                    price_df['Volume'] = df['volume']
+                
+                price_df['Date'] = pd.to_datetime(price_df['Date'])
+                price_df.set_index('Date', inplace=True)
+                return price_df
+            return pd.DataFrame()  # Empty DataFrame if invalid dict
         
-        # Check if we have fresh cached data
-        if not force_refresh and cache_key in self.cache:
-            # Use cached data if it exists and is recent (within 4 hours)
-            if (datetime.now() - self.last_fetch_time.get(cache_key, datetime(1970, 1, 1))).total_seconds() < 14400:
-                return self.cache[cache_key]
+        # If already a DataFrame, ensure it has required columns
+        if isinstance(df, pd.DataFrame):
+            if 'Close' not in df.columns:
+                raise ValueError("DataFrame must contain 'Close' prices")
+            return df
         
-        # Try to load from disk cache
-        if not force_refresh and os.path.exists(cache_file):
-            try:
-                with open(cache_file, 'r') as f:
-                    cache_data = json.load(f)
-                    
-                # Check if cache is fresh (within 4 hours)
-                if 'timestamp' in cache_data:
-                    cache_time = datetime.fromisoformat(cache_data['timestamp'])
-                    if (datetime.now() - cache_time).total_seconds() < 14400:
-                        self.cache[cache_key] = cache_data
-                        self.last_fetch_time[cache_key] = cache_time
-                        return cache_data
-            except Exception as e:
-                print(f"Error loading cache for {symbol}: {e}")
+        return pd.DataFrame()  # Empty DataFrame for any other type
+    
+    @staticmethod
+    def calculate_rsi(df, period=14):
+        """
+        Calculate the Relative Strength Index (RSI).
         
-        # Fetch fresh data if no valid cache exists
-        try:
-            # Download stock data
-            stock = yf.Ticker(symbol)
+        Args:
+            df (pd.DataFrame): Historical price data with 'Close' column
+            period (int): RSI period (typically 14)
             
-            # Convert timeframe to pandas date offset
-            if timeframe == '1mo':
-                period = '1mo'
-                days = 30
-            elif timeframe == '3mo':
-                period = '3mo'
-                days = 90
-            elif timeframe == '6mo':
-                period = '6mo'
-                days = 180
-            elif timeframe == '1y':
-                period = '1y'
-                days = 365
+        Returns:
+            float: The most recent RSI value
+        """
+        try:
+            # Ensure we have a DataFrame
+            df = TechnicalIndicators.ensure_dataframe(df)
+            
+            # Need at least period+1 data points to calculate RSI
+            if len(df) < period + 1:
+                return 50  # Return neutral RSI if not enough data
+                
+            # Calculate price changes
+            delta = df['Close'].diff().dropna()
+            
+            # Separate gains and losses
+            gains = delta.copy()
+            losses = delta.copy()
+            gains[gains < 0] = 0
+            losses[losses > 0] = 0
+            losses = -losses  # Make losses positive for calculations
+            
+            # Calculate average gains and losses
+            avg_gain = gains.rolling(window=period).mean()
+            avg_loss = losses.rolling(window=period).mean()
+            
+            # Calculate RS and RSI
+            rs = avg_gain / avg_loss.replace(0, 1e-10)  # Avoid division by zero
+            rsi = 100 - (100 / (1 + rs))
+            
+            # Return the most recent RSI value, or 50 (neutral) if calculation failed
+            final_rsi = rsi.iloc[-1]
+            if pd.isna(final_rsi):
+                return 50
+                
+            return float(final_rsi)
+        except Exception as e:
+            print(f"Error calculating RSI: {e}")
+            return 50
+    
+    @staticmethod
+    def calculate_macd(df, fast_period=12, slow_period=26, signal_period=9):
+        """
+        Calculate the Moving Average Convergence Divergence (MACD).
+        
+        Args:
+            df (pd.DataFrame): Historical price data with 'Close' column
+            fast_period (int): Fast EMA period (typically 12)
+            slow_period (int): Slow EMA period (typically 26)
+            signal_period (int): Signal line period (typically 9)
+            
+        Returns:
+            tuple: (MACD line value, Signal line value, Histogram value)
+        """
+        try:
+            # Ensure we have a DataFrame
+            df = TechnicalIndicators.ensure_dataframe(df)
+            
+            # Need enough data for the slow period calculation
+            if len(df) < slow_period + signal_period:
+                return 0, 0, 0  # Return neutral values if not enough data
+                
+            # Calculate EMAs
+            ema_fast = df['Close'].ewm(span=fast_period, adjust=False).mean()
+            ema_slow = df['Close'].ewm(span=slow_period, adjust=False).mean()
+            
+            # Calculate MACD line, signal line, and histogram
+            macd_line = ema_fast - ema_slow
+            signal_line = macd_line.ewm(span=signal_period, adjust=False).mean()
+            histogram = macd_line - signal_line
+            
+            # Get latest values
+            latest_macd = float(macd_line.iloc[-1])
+            latest_signal = float(signal_line.iloc[-1])
+            latest_histogram = float(histogram.iloc[-1])
+            
+            # Check for NaN values
+            if pd.isna(latest_macd) or pd.isna(latest_signal) or pd.isna(latest_histogram):
+                return 0, 0, 0
+                
+            return latest_macd, latest_signal, latest_histogram
+        except Exception as e:
+            print(f"Error calculating MACD: {e}")
+            return 0, 0, 0
+    
+    @staticmethod
+    def calculate_bollinger_bands(df, period=20, num_std=2):
+        """
+        Calculate Bollinger Bands.
+        
+        Args:
+            df (pd.DataFrame): Historical price data with 'Close' column
+            period (int): Moving average period (typically 20)
+            num_std (int): Number of standard deviations (typically 2)
+            
+        Returns:
+            tuple: (Upper Band, Middle Band, Lower Band, %B)
+        """
+        try:
+            # Ensure we have a DataFrame
+            df = TechnicalIndicators.ensure_dataframe(df)
+            
+            # Need at least 'period' data points
+            if len(df) < period:
+                latest_price = df['Close'].iloc[-1]
+                return float(latest_price * 1.05), float(latest_price), float(latest_price * 0.95), 0.5
+                
+            # Calculate middle band (SMA)
+            middle_band = df['Close'].rolling(window=period).mean()
+            
+            # Calculate standard deviation
+            std_dev = df['Close'].rolling(window=period).std()
+            
+            # Calculate upper and lower bands
+            upper_band = middle_band + (std_dev * num_std)
+            lower_band = middle_band - (std_dev * num_std)
+            
+            # Calculate %B (position within the bands)
+            latest_price = df['Close'].iloc[-1]
+            latest_upper = upper_band.iloc[-1]
+            latest_middle = middle_band.iloc[-1]
+            latest_lower = lower_band.iloc[-1]
+            
+            # Handle potential division by zero
+            band_width = latest_upper - latest_lower
+            if band_width <= 0:
+                percent_b = 0.5  # Default to middle
             else:
-                period = '1mo'
-                days = 30
-            
-            # Get historical data with buffer for calculations
-            buffer_days = 60  # Additional days for calculating indicators
-            start_date = (datetime.now() - timedelta(days=days+buffer_days)).strftime('%Y-%m-%d')
-            
-            # Fetch historical data
-            df = stock.history(start=start_date)
-            
-            if df.empty:
-                return {"error": f"No data available for {symbol}"}
-            
-            # Process the data
-            result = self._process_technical_data(df, symbol, timeframe)
-            
-            # Cache the results
-            self.cache[cache_key] = result
-            self.last_fetch_time[cache_key] = datetime.now()
-            
-            # Make data safe for JSON serialization
-            safe_result = make_json_safe(result)
-            
-            # Save to disk cache
-            safe_result['timestamp'] = datetime.now().isoformat()
-            try:
-                with open(cache_file, 'w') as f:
-                    json.dump(safe_result, f, cls=CustomJSONEncoder)  # Use the custom encoder as a backup
-            except Exception as e:
-                print(f"Warning: Could not save cache file for {symbol}: {e}")
-            
-            return result
-            
+                percent_b = (latest_price - latest_lower) / band_width
+                
+            # Check for NaN values and provide defaults if needed
+            if pd.isna(latest_upper) or pd.isna(latest_middle) or pd.isna(latest_lower) or pd.isna(percent_b):
+                latest_price = df['Close'].iloc[-1]
+                return float(latest_price * 1.05), float(latest_price), float(latest_price * 0.95), 0.5
+                
+            return float(latest_upper), float(latest_middle), float(latest_lower), float(percent_b)
         except Exception as e:
-            error_msg = f"Error fetching technical data for {symbol}: {str(e)}"
-            print(error_msg)
-            return {"error": error_msg}
+            print(f"Error calculating Bollinger Bands: {e}")
+            latest_price = df['Close'].iloc[-1] if len(df) > 0 else 0
+            return float(latest_price * 1.05), float(latest_price), float(latest_price * 0.95), 0.5
     
-    def _process_technical_data(self, df, symbol, timeframe):
+    @staticmethod
+    def calculate_adx(df, period=14):
         """
-        Process raw price data to calculate technical indicators.
+        Calculate the Average Directional Index (ADX).
         
         Args:
-            df (DataFrame): Raw price data
-            symbol (str): Stock symbol
-            timeframe (str): Time period
+            df (pd.DataFrame): Historical price data with High, Low, Close columns
+            period (int): ADX period (typically 14)
             
         Returns:
-            dict: Technical analysis results
+            tuple: (ADX, +DI, -DI)
         """
-        # Ensure index is datetime and sorted
-        df.index = pd.to_datetime(df.index)
-        df = df.sort_index()
-        
-        # Basic price metrics
-        current_price = df['Close'].iloc[-1]
-        
-        # Define start_date based on the timeframe
-        if timeframe == '1mo':
-            days_back = 30
-        elif timeframe == '3mo':
-            days_back = 90
-        elif timeframe == '6mo':
-            days_back = 180
-        elif timeframe == '1y':
-            days_back = 365
-        else:
-            days_back = 30
-        
-        # Calculate start_date from the current date
-        start_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
-        
-        # Trim the buffer before calculating returns
-        if timeframe == '1mo':
-            actual_df = df.iloc[-30:]
-        elif timeframe == '3mo':
-            actual_df = df.iloc[-90:]
-        elif timeframe == '6mo':
-            actual_df = df.iloc[-180:]
-        elif timeframe == '1y':
-            actual_df = df.iloc[-365:]
-        else:
-            actual_df = df.iloc[-30:]
-        
-        # Calculate returns
-        start_price = actual_df['Close'].iloc[0]
-        price_change = (current_price - start_price) / start_price * 100
-        
-        # Calculate volatility
-        daily_returns = df['Close'].pct_change().dropna()
-        volatility = daily_returns.std() * (252 ** 0.5) * 100  # Annualized
-        
-        # Calculate standard technical indicators
-        indicators = {}
-        
-        # Moving Averages
-        for window in [10, 20, 50, 200]:
-            if len(df) >= window:
-                indicators[f'MA_{window}'] = df['Close'].rolling(window=window).mean().iloc[-1]
-        
-        # Calculate RSI
-        if len(df) >= 14:
-            delta = df['Close'].diff()
-            gain = delta.where(delta > 0, 0).rolling(window=14).mean()
-            loss = -delta.where(delta < 0, 0).rolling(window=14).mean()
-            rs = gain / loss
-            indicators['RSI_14'] = 100 - (100 / (1 + rs.iloc[-1]))
-        
-        # Calculate MACD
-        if len(df) >= 26:
-            ema12 = df['Close'].ewm(span=12).mean()
-            ema26 = df['Close'].ewm(span=26).mean()
-            macd_line = ema12 - ema26
-            signal_line = macd_line.ewm(span=9).mean()
-            
-            indicators['MACD'] = macd_line.iloc[-1]
-            indicators['MACD_Signal'] = signal_line.iloc[-1]
-            indicators['MACD_Histogram'] = macd_line.iloc[-1] - signal_line.iloc[-1]
-        
-        # Bollinger Bands
-        if len(df) >= 20:
-            rolling_mean = df['Close'].rolling(window=20).mean()
-            rolling_std = df['Close'].rolling(window=20).std()
-            
-            indicators['BB_Upper'] = rolling_mean.iloc[-1] + (rolling_std.iloc[-1] * 2)
-            indicators['BB_Middle'] = rolling_mean.iloc[-1]
-            indicators['BB_Lower'] = rolling_mean.iloc[-1] - (rolling_std.iloc[-1] * 2)
-            
-            # Calculate %B (relative position within the bands)
-            indicators['BB_Percent'] = (df['Close'].iloc[-1] - indicators['BB_Lower']) / (indicators['BB_Upper'] - indicators['BB_Lower'])
-        
-        # Calculate trend strength indicators
-        
-        # Average Directional Index (ADX)
-        if len(df) >= 14:
-            try:
-                # Calculate +DI and -DI
-                high_diff = df['High'].diff()
-                low_diff = df['Low'].diff().abs()
-                
-                plus_dm = high_diff.copy()
-                plus_dm[plus_dm < 0] = 0
-                plus_dm[(high_diff <= 0) | (high_diff <= low_diff)] = 0
-                
-                minus_dm = low_diff.copy()
-                minus_dm[minus_dm < 0] = 0
-                minus_dm[(low_diff <= 0) | (low_diff <= high_diff)] = 0
-                
-                tr = pd.DataFrame()
-                tr['h-l'] = df['High'] - df['Low']
-                tr['h-pc'] = (df['High'] - df['Close'].shift()).abs()
-                tr['l-pc'] = (df['Low'] - df['Close'].shift()).abs()
-                tr['tr'] = tr.max(axis=1)
-                
-                atr = tr['tr'].rolling(14).mean()
-                
-                plus_di = 100 * (plus_dm.rolling(14).mean() / atr)
-                minus_di = 100 * (minus_dm.rolling(14).mean() / atr)
-                
-                dx = 100 * ((plus_di - minus_di).abs() / (plus_di + minus_di))
-                adx = dx.rolling(14).mean()
-                
-                indicators['ADX'] = adx.iloc[-1]
-                indicators['+DI'] = plus_di.iloc[-1]
-                indicators['-DI'] = minus_di.iloc[-1]
-            except Exception as e:
-                print(f"Error calculating ADX: {e}")
-        
-        # AI+ Enhanced Indicators
-        
-        # Price Momentum Strength
-        price_momentum = {}
-        for period in [5, 10, 20, 60]:
-            if len(df) >= period:
-                momentum = (df['Close'].iloc[-1] / df['Close'].iloc[-period] - 1) * 100
-                price_momentum[f'momentum_{period}d'] = momentum
-        
-        # Volatility trend
-        volatility_trend = {}
-        for period in [10, 20]:
-            if len(df) >= period * 2:
-                recent_vol = df['Close'].iloc[-period:].pct_change().std() * (252 ** 0.5) * 100
-                previous_vol = df['Close'].iloc[-period*2:-period].pct_change().std() * (252 ** 0.5) * 100
-                volatility_trend[f'vol_change_{period}d'] = recent_vol - previous_vol
-        
-        # Volume analysis
-        volume_analysis = {}
-        if 'Volume' in df.columns:
-            # Calculate OBV (On-Balance Volume)
-            obv = (np.sign(df['Close'].diff()) * df['Volume']).fillna(0).cumsum()
-            volume_analysis['OBV'] = obv.iloc[-1]
-            
-            # Volume trend
-            avg_volume_10d = df['Volume'].iloc[-10:].mean()
-            avg_volume_30d = df['Volume'].iloc[-30:].mean()
-            volume_analysis['volume_ratio_10d_30d'] = avg_volume_10d / avg_volume_30d if avg_volume_30d > 0 else 1.0
-            
-            # Price-volume relationship
-            price_volume_corr = df['Close'].iloc[-20:].pct_change().corr(df['Volume'].iloc[-20:].pct_change())
-            volume_analysis['price_volume_corr_20d'] = price_volume_corr
-        
-        # Market context
-        market_context = {}
         try:
-            # Get S&P 500 data
-            sp500 = yf.Ticker('^GSPC').history(start=start_date)
+            # Ensure we have a DataFrame
+            df = TechnicalIndicators.ensure_dataframe(df)
             
-            if not sp500.empty:
-                # Calculate beta
-                if len(df) > 20 and len(sp500) > 20:
-                    stock_returns = df['Close'].pct_change().dropna()
-                    market_returns = sp500['Close'].pct_change().dropna()
+            # Check for required columns
+            required_columns = ['High', 'Low', 'Close']
+            for column in required_columns:
+                if column not in df.columns:
+                    return 20, 0, 0  # Return default values if missing columns
                     
-                    # Align dates
-                    aligned_data = pd.concat([stock_returns, market_returns], axis=1).dropna()
-                    if len(aligned_data) > 1:  # Need at least 2 points for regression
-                        beta, alpha, r_value, p_value, std_err = stats.linregress(
-                            aligned_data.iloc[:, 1],  # Market returns
-                            aligned_data.iloc[:, 0]   # Stock returns
-                        )
-                        market_context['beta'] = beta
-                        market_context['r_squared'] = r_value ** 2
+            # Need enough data points
+            if len(df) < period + 1:
+                return 20, 0, 0  # Return default values if not enough data
                 
-                # Relative strength vs S&P 500
-                stock_performance = (df['Close'].iloc[-1] / df['Close'].iloc[0]) - 1
-                market_performance = (sp500['Close'].iloc[-1] / sp500['Close'].iloc[0]) - 1
-                market_context['relative_strength'] = stock_performance - market_performance
+            # True Range
+            df['H-L'] = df['High'] - df['Low']
+            df['H-PC'] = abs(df['High'] - df['Close'].shift(1))
+            df['L-PC'] = abs(df['Low'] - df['Close'].shift(1))
+            df['TR'] = df[['H-L', 'H-PC', 'L-PC']].max(axis=1)
+            df['ATR'] = df['TR'].rolling(window=period).mean()
+            
+            # Plus Directional Movement (+DM)
+            df['H-PH'] = df['High'] - df['High'].shift(1)
+            df['PL-L'] = df['Low'].shift(1) - df['Low']
+            df['+DM'] = np.where((df['H-PH'] > df['PL-L']) & (df['H-PH'] > 0), df['H-PH'], 0)
+            df['-DM'] = np.where((df['PL-L'] > df['H-PH']) & (df['PL-L'] > 0), df['PL-L'], 0)
+            
+            # Smoothed +DM and -DM
+            df['+DM'] = df['+DM'].rolling(window=period).mean()
+            df['-DM'] = df['-DM'].rolling(window=period).mean()
+            
+            # Directional Indicators
+            df['+DI'] = 100 * (df['+DM'] / df['ATR'].replace(0, 1e-10))
+            df['-DI'] = 100 * (df['-DM'] / df['ATR'].replace(0, 1e-10))
+            
+            # Directional Index
+            df['DX'] = 100 * abs(df['+DI'] - df['-DI']) / (df['+DI'] + df['-DI']).replace(0, 1e-10)
+            
+            # Average Directional Index
+            df['ADX'] = df['DX'].rolling(window=period).mean()
+            
+            # Get latest values
+            latest_adx = df['ADX'].iloc[-1]
+            latest_plus_di = df['+DI'].iloc[-1]
+            latest_minus_di = df['-DI'].iloc[-1]
+            
+            # Handle NaN values
+            if pd.isna(latest_adx) or pd.isna(latest_plus_di) or pd.isna(latest_minus_di):
+                return 20, 0, 0
+                
+            return float(latest_adx), float(latest_plus_di), float(latest_minus_di)
+                
         except Exception as e:
-            print(f"Error calculating market context: {e}")
+            print(f"Error calculating ADX: {e}")
+            return 20, 0, 0
+    
+    @staticmethod
+    def calculate_moving_averages(df, periods=[20, 50, 200]):
+        """
+        Calculate Simple Moving Averages for multiple periods.
         
-        # AI+ Prediction Metrics
+        Args:
+            df (pd.DataFrame): Historical price data with 'Close' column
+            periods (list): List of periods to calculate
+            
+        Returns:
+            dict: Dictionary of moving averages by period
+        """
+        try:
+            # Ensure we have a DataFrame
+            df = TechnicalIndicators.ensure_dataframe(df)
+            
+            result = {}
+            
+            for period in periods:
+                # Skip if not enough data
+                if len(df) < period:
+                    result[f'MA_{period}'] = float(df['Close'].iloc[-1])  # Use current price as fallback
+                    continue
+                    
+                # Calculate SMA
+                ma = df['Close'].rolling(window=period).mean().iloc[-1]
+                
+                # Handle NaN
+                if pd.isna(ma):
+                    ma = float(df['Close'].iloc[-1])  # Use current price as fallback
+                    
+                result[f'MA_{period}'] = float(ma)
+                
+            return result
+        except Exception as e:
+            print(f"Error calculating Moving Averages: {e}")
+            result = {}
+            for period in periods:
+                result[f'MA_{period}'] = 0
+            return result
+    
+    @staticmethod
+    def calculate_volatility(df, period=20, annualized=True):
+        """
+        Calculate price volatility.
         
-        # Calculate the TSMN (Temporal-Spectral Momentum Nexus) indicator
-        # This is your custom indicator combining multiple signal types
-        tsmn = self._calculate_tsmn(df)
+        Args:
+            df (pd.DataFrame): Historical price data with 'Close' column
+            period (int): Period for volatility calculation
+            annualized (bool): Whether to annualize the volatility
+            
+        Returns:
+            float: Volatility as a percentage
+        """
+        try:
+            # Ensure we have a DataFrame
+            df = TechnicalIndicators.ensure_dataframe(df)
+            
+            # Need at least 'period' data points
+            if len(df) < period:
+                return 20  # Return default moderate volatility if not enough data
+                
+            # Calculate daily returns
+            returns = df['Close'].pct_change().dropna()
+            
+            # Calculate volatility (standard deviation of returns)
+            volatility = returns.rolling(window=period).std().iloc[-1]
+            
+            # Handle NaN
+            if pd.isna(volatility):
+                return 20
+                
+            # Annualize if requested (approximately 252 trading days in a year)
+            if annualized:
+                volatility = volatility * np.sqrt(252)
+                
+            # Convert to percentage
+            volatility = volatility * 100
+            
+            return float(volatility)
+        except Exception as e:
+            print(f"Error calculating Volatility: {e}")
+            return 20
+    
+    @staticmethod
+    def calculate_tsmn(df):
+        """
+        Calculate the Temporal-Spectral Momentum Nexus (TSMN) indicator.
+        This is a custom momentum indicator combining various technical factors.
         
-        # Compile results
+        Args:
+            df (pd.DataFrame): Historical price data
+            
+        Returns:
+            dict: TSMN indicator values and signal
+        """
+        try:
+            # Ensure we have a DataFrame
+            df = TechnicalIndicators.ensure_dataframe(df)
+            
+            # Need at least 30 data points for meaningful calculation
+            if len(df) < 30:
+                return {
+                    "value": 0,
+                    "signal": "neutral",
+                    "strength": "weak"
+                }
+            
+            # Calculate RSI values for different periods
+            rsi_5 = TechnicalIndicators.calculate_rsi(df, period=5)
+            rsi_14 = TechnicalIndicators.calculate_rsi(df, period=14) 
+            rsi_20 = TechnicalIndicators.calculate_rsi(df, period=20)
+            
+            # Calculate price momentum
+            close_series = df['Close']
+            price_momentum = {}
+            for period in [5, 10, 20]:
+                if len(df) >= period:
+                    momentum = (close_series.iloc[-1] / close_series.iloc[-period] - 1) * 100
+                    price_momentum[f'{period}d'] = float(momentum)
+            
+            # Calculate volatility factor
+            volatility = TechnicalIndicators.calculate_volatility(df)
+            vol_factor = min(1.5, max(0.5, 20 / volatility))  # Higher volatility = lower factor
+            
+            # Calculate volume factor if volume data exists
+            volume_factor = 1.0
+            if 'Volume' in df.columns:
+                recent_volume = df['Volume'].iloc[-5:].mean()
+                avg_volume = df['Volume'].iloc[-20:].mean()
+                if avg_volume > 0:
+                    volume_factor = min(1.5, max(0.5, recent_volume / avg_volume))
+            
+            # Calculate momentum gradient (difference between fast and slow RSI)
+            momentum_gradient = rsi_5 - rsi_20
+            
+            # Calculate temporal changes in momentum
+            temporal_factor = momentum_gradient / 10  # Scale factor
+            
+            # Combine factors for TSMN calculation
+            tsmn_raw = momentum_gradient * volume_factor * vol_factor * (1 + 0.2 * temporal_factor)
+            
+            # Scale to -100 to +100 range
+            tsmn_value = max(min(tsmn_raw * 5, 100), -100)
+            
+            # Determine signal and strength
+            if tsmn_value > 60:
+                signal = "bullish"
+                strength = "strong"
+            elif tsmn_value > 20:
+                signal = "bullish"
+                strength = "moderate"
+            elif tsmn_value < -60:
+                signal = "bearish"
+                strength = "strong"
+            elif tsmn_value < -20:
+                signal = "bearish"
+                strength = "moderate"
+            else:
+                signal = "neutral"
+                strength = "weak"
+            
+            return {
+                "value": float(tsmn_value),
+                "signal": signal,
+                "strength": strength,
+                "components": {
+                    "momentum_gradient": float(momentum_gradient),
+                    "volume_factor": float(volume_factor),
+                    "volatility_factor": float(vol_factor),
+                    "rsi_5": float(rsi_5),
+                    "rsi_20": float(rsi_20)
+                }
+            }
+        except Exception as e:
+            print(f"Error calculating TSMN: {e}")
+            return {
+                "value": 0,
+                "signal": "neutral",
+                "strength": "weak"
+            }
+    
+    @staticmethod
+    def calculate_all_indicators(df):
+        """
+        Calculate all essential technical indicators from price data.
+        
+        Args:
+            df: DataFrame or dict with price data
+            
+        Returns:
+            dict: All calculated technical indicators
+        """
+        try:
+            # Ensure we have a proper DataFrame
+            df = TechnicalIndicators.ensure_dataframe(df)
+            
+            # Validate data
+            if df.empty or len(df) < 20:
+                return {
+                    "indicators_calculated": False,
+                    "reason": f"Insufficient price data (need at least 20 points)"
+                }
+                
+            # RSI
+            rsi_14 = TechnicalIndicators.calculate_rsi(df)
+            
+            # MACD
+            macd, macd_signal, macd_hist = TechnicalIndicators.calculate_macd(df)
+            
+            # Bollinger Bands
+            bb_upper, bb_middle, bb_lower, bb_percent = TechnicalIndicators.calculate_bollinger_bands(df)
+            
+            # ADX
+            adx, plus_di, minus_di = TechnicalIndicators.calculate_adx(df)
+            
+            # Moving Averages
+            moving_averages = TechnicalIndicators.calculate_moving_averages(df)
+            
+            # Volatility
+            volatility = TechnicalIndicators.calculate_volatility(df)
+            
+            # TSMN
+            tsmn = TechnicalIndicators.calculate_tsmn(df)
+            
+            # Compile all indicators
+            indicators = {
+                "indicators_calculated": True,
+                "standard_indicators": {
+                    "RSI_14": rsi_14,
+                    "MACD": macd,
+                    "MACD_Signal": macd_signal,
+                    "MACD_Histogram": macd_hist,
+                    "BB_Upper": bb_upper,
+                    "BB_Middle": bb_middle,
+                    "BB_Lower": bb_lower,
+                    "BB_Percent": bb_percent,
+                    "ADX": adx,
+                    "+DI": plus_di,
+                    "-DI": minus_di
+                },
+                "moving_averages": moving_averages,
+                "volatility": volatility,
+                "tsmn": tsmn
+            }
+            
+            # Add moving averages to standard indicators for compatibility
+            indicators["standard_indicators"].update(moving_averages)
+            
+            return indicators
+            
+        except Exception as e:
+            print(f"Error calculating indicators: {e}")
+            return {
+                "indicators_calculated": False,
+                "reason": f"Error: {str(e)}"
+            }
+
+
+def get_aiplus_technical_data(symbol, timeframe='1mo', force_refresh=False):
+    """
+    Get technical data for AI analysis of a stock.
+    
+    Args:
+        symbol (str): Stock symbol
+        timeframe (str): Time period - '1mo', '3mo', '6mo', '1y'
+        force_refresh (bool): Whether to force refresh data
+        
+    Returns:
+        dict: Technical data results with all indicators
+    """
+    # Create cache key and file path
+    cache_key = f"{symbol}_{timeframe}"
+    cache_file = os.path.join(DATA_CACHE_DIR, f"{symbol}_tech.json")
+    
+    # Use cached data if available and not forcing refresh
+    if not force_refresh and os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'r') as f:
+                cache_data = json.load(f)
+                
+            # Check if cache is fresh (within 4 hours)
+            if 'timestamp' in cache_data:
+                cache_time = datetime.fromisoformat(cache_data['timestamp'])
+                if (datetime.now() - cache_time).total_seconds() < 14400:
+                    return cache_data
+        except Exception as e:
+            print(f"Error loading cache for {symbol}: {e}")
+    
+    try:
+        # Get company info using Ticker
+        stock = yf.Ticker(symbol)
+        try:
+            info = stock.info
+            company_name = info.get('longName', symbol)
+            sector = info.get('sector', 'Unknown')
+            industry = info.get('industry', 'Unknown')
+            market_cap = info.get('marketCap', 0)
+        except Exception as e:
+            print(f"Warning: Could not get company info for {symbol}: {e}")
+            company_name = symbol
+            sector = "Unknown"
+            industry = "Unknown"
+            market_cap = 0
+        
+        # Convert timeframe to period parameter
+        if timeframe == '1mo':
+            period = "1mo"
+            days = 30
+        elif timeframe == '3mo':
+            period = "3mo"
+            days = 90
+        elif timeframe == '6mo':
+            period = "6mo"
+            days = 180
+        elif timeframe == '1y':
+            period = "1y"
+            days = 365
+        else:
+            period = "1mo"
+            days = 30
+        
+        # Get historical data with period parameter
+        df = yf.download(symbol, period=period, progress=False)
+        
+        if df.empty:
+            return {"error": f"No data available for {symbol}"}
+        
+        # Fix timezone issues by resetting index and removing timezone
+        df = df.reset_index()
+        df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
+        
+        # Basic metrics - ensure they're converted to Python native types
+        current_price = float(df['Close'].iloc[-1])
+        start_price = float(df['Close'].iloc[0])  
+        price_change = float((current_price - start_price) / start_price * 100)
+        
+        # Convert date to strings for JSON compatibility
+        dates = [date.strftime('%Y-%m-%d') for date in df['Date']]
+        
+        # Prepare price data with explicit type conversion and error handling
+        price_data = {}
+        try:
+            # Process each series individually with proper error handling
+            price_data['close'] = []
+            for x in df['Close'].values:
+                try:
+                    price_data['close'].append(float(x))
+                except:
+                    price_data['close'].append(None)
+                    
+            price_data['open'] = []
+            for x in df['Open'].values:
+                try:
+                    price_data['open'].append(float(x))
+                except:
+                    price_data['open'].append(None)
+                    
+            price_data['high'] = []
+            for x in df['High'].values:
+                try:
+                    price_data['high'].append(float(x))
+                except:
+                    price_data['high'].append(None)
+                    
+            price_data['low'] = []
+            for x in df['Low'].values:
+                try:
+                    price_data['low'].append(float(x))
+                except:
+                    price_data['low'].append(None)
+        except Exception as e:
+            print(f"Error converting price data: {e}")
+            # Fallback using direct values
+            price_data = {
+                'close': df['Close'].values.tolist(),
+                'open': df['Open'].values.tolist(),
+                'high': df['High'].values.tolist(),
+                'low': df['Low'].values.tolist(),
+            }
+        
+        # Handle volume data with error handling
+        volume_data = {}
+        if 'Volume' in df.columns:
+            try:
+                volume_data['volume'] = []
+                for x in df['Volume'].values:
+                    try:
+                        if pd.isna(x):
+                            volume_data['volume'].append(0)
+                        else:
+                            volume_data['volume'].append(float(x))
+                    except:
+                        volume_data['volume'].append(0)
+            except Exception as e:
+                print(f"Error converting volume data: {e}")
+                # Fallback with direct values
+                volume_data['volume'] = df['Volume'].values.tolist()
+                
+        # Create combined price data for indicator calculation
+        price_df = pd.DataFrame({
+            'Date': dates,
+            'Close': price_data['close'],
+            'Open': price_data['open'],
+            'High': price_data['high'],
+            'Low': price_data['low']
+        })
+        if 'volume' in volume_data:
+            price_df['Volume'] = volume_data['volume']
+            
+        # Set date as index
+        price_df['Date'] = pd.to_datetime(price_df['Date'])
+        indicator_df = price_df.set_index('Date')
+        
+        # Calculate all technical indicators dynamically
+        indicators = TechnicalIndicators.calculate_all_indicators(indicator_df)
+        
+        # Extract calculated indicators
+        if indicators.get('indicators_calculated', False):
+            standard_indicators = indicators.get('standard_indicators', {})
+            tsmn = indicators.get('tsmn', {})
+            volatility = indicators.get('volatility', 20)
+            
+            # Generate technical summary based on indicators
+            technical_summary = generate_technical_summary(
+                price_change, volatility, standard_indicators, tsmn
+            )
+        else:
+            standard_indicators = {}
+            tsmn = {"value": 0, "signal": "neutral", "strength": "weak"}
+            volatility = 20
+            technical_summary = "Insufficient data to generate technical summary."
+        
+        # Compile result
         result = {
             "symbol": symbol,
+            "company_name": company_name,
+            "sector": sector,
+            "industry": industry,
+            "market_cap": market_cap,
             "timeframe": timeframe,
             "current_price": current_price,
             "price_change_pct": price_change,
             "volatility": volatility,
-            "standard_indicators": indicators,
-            "price_momentum": price_momentum,
-            "volatility_trend": volatility_trend,
-            "volume_analysis": volume_analysis,
-            "market_context": market_context,
+            "standard_indicators": standard_indicators,
             "tsmn": tsmn,
-            "pattern_detection": self._detect_patterns(df),
-            "technical_summary": self._generate_technical_summary(
-                current_price, price_change, volatility, indicators, 
-                price_momentum, tsmn
-            )
+            "price_data": price_data,
+            "volume_data": volume_data,
+            "dates": dates,
+            "technical_summary": technical_summary,
+            "timestamp": datetime.now().isoformat()
         }
         
+        # Save to cache
+        try:
+            with open(cache_file, 'w') as f:
+                json.dump(result, f)
+        except Exception as e:
+            print(f"Warning: Could not cache results for {symbol}: {e}")
+        
         return result
+        
+    except Exception as e:
+        error_msg = f"Error fetching technical data for {symbol}: {str(e)}"
+        print(error_msg)
+        return {"error": error_msg}
+
+
+def generate_technical_summary(price_change, volatility, indicators, tsmn):
+    """
+    Generate a human-readable summary of technical indicators.
     
-    def _calculate_tsmn(self, df):
-        """
-        Calculate the Temporal-Spectral Momentum Nexus indicator.
+    Args:
+        price_change (float): Percentage price change
+        volatility (float): Volatility percentage
+        indicators (dict): Technical indicators
+        tsmn (dict): TSMN indicator
         
-        Args:
-            df (DataFrame): Price and volume data
-            
-        Returns:
-            dict: TSMN data
-        """
-        try:
-            # Ensure minimum data length
-            if len(df) < 60:
-                return {"error": "Insufficient data for TSMN calculation"}
-            
-            # Get price data
-            close = df['Close']
-            
-            # Calculate RSI values
-            rsi_5 = self._calculate_rsi(close, 5)
-            rsi_14 = self._calculate_rsi(close, 14)
-            rsi_20 = self._calculate_rsi(close, 20)
-            
-            # Calculate momentum gradient
-            momentum_gradient = rsi_5.iloc[-1] - rsi_20.iloc[-1]
-            
-            # Calculate temporal gradient (rate of change of momentum)
-            rsi_5_change = rsi_5.diff(periods=5).iloc[-1]
-            
-            # Incorporate volume information if available
-            volume_factor = 1.0
-            if 'Volume' in df.columns:
-                # Calculate volume ratio compared to moving average
-                volume = df['Volume']
-                volume_ma = volume.rolling(window=20).mean()
-                volume_ratio = volume.iloc[-1] / volume_ma.iloc[-1] if volume_ma.iloc[-1] > 0 else 1.0
-                
-                # Bound volume factor between 0.5 and 1.5
-                volume_factor = min(max(volume_ratio, 0.5), 1.5)
-            
-            # Spectral component - use price velocities at different frequencies
-            diff_1d = close.diff(periods=1).fillna(0)
-            diff_5d = close.diff(periods=5).fillna(0)
-            diff_20d = close.diff(periods=20).fillna(0)
-            
-            # Normalize by recent volatility
-            vol_20d = close.pct_change().rolling(window=20).std().iloc[-1]
-            if vol_20d > 0:
-                spec_1d = diff_1d.iloc[-1] / (close.iloc[-1] * vol_20d)
-                spec_5d = diff_5d.iloc[-1] / (close.iloc[-1] * vol_20d * (5**0.5))
-                spec_20d = diff_20d.iloc[-1] / (close.iloc[-1] * vol_20d * (20**0.5))
-            else:
-                spec_1d = spec_5d = spec_20d = 0
-            
-            # Add spectral components with higher weight for shorter term
-            spectral_factor = (0.5 * spec_1d + 0.3 * spec_5d + 0.2 * spec_20d)
-            
-            # Calculate final TSMN
-            tsmn_raw = momentum_gradient * (1 + 0.2 * rsi_5_change) * volume_factor * (1 + spectral_factor)
-            
-            # Normalize to -100 to +100 scale (approximately)
-            tsmn_normalized = max(min(tsmn_raw * 5, 100), -100)
-            
-            # TSMN signal interpretation
-            signal = "neutral"
-            strength = "weak"
-            
-            if tsmn_normalized > 60:
-                signal = "strong_buy"
-                strength = "strong"
-            elif tsmn_normalized > 20:
-                signal = "buy"
-                strength = "moderate"
-            elif tsmn_normalized < -60:
-                signal = "strong_sell"
-                strength = "strong"
-            elif tsmn_normalized < -20:
-                signal = "sell"
-                strength = "moderate"
-            
-            return {
-                "value": tsmn_normalized,
-                "signal": signal,
-                "strength": strength,
-                "components": {
-                    "momentum_gradient": momentum_gradient,
-                    "rsi_change": rsi_5_change,
-                    "volume_factor": volume_factor,
-                    "spectral_factor": spectral_factor
-                }
-            }
-            
-        except Exception as e:
-            print(f"Error calculating TSMN: {e}")
-            return {"error": str(e)}
-    
-    def _calculate_rsi(self, series, window):
-        """Calculate RSI for a price series."""
-        delta = series.diff().dropna()
-        up = delta.copy()
-        down = delta.copy()
-        up[up < 0] = 0
-        down[down > 0] = 0
-        avg_gain = up.rolling(window=window).mean()
-        avg_loss = down.abs().rolling(window=window).mean()
-        rs = avg_gain / avg_loss
-        rsi = 100.0 - (100.0 / (1.0 + rs))
-        return rsi
-    
-    def _detect_patterns(self, df):
-        """
-        Detect technical chart patterns in the price data.
+    Returns:
+        str: Technical summary
+    """
+    try:
+        # Get key indicators
+        rsi = indicators.get('RSI_14', None)
+        macd = indicators.get('MACD', None)
+        macd_signal = indicators.get('MACD_Signal', None)
+        bb_percent = indicators.get('BB_Percent', None)
+        tsmn_value = tsmn.get('value', 0)
         
-        Args:
-            df (DataFrame): Price data
-            
-        Returns:
-            dict: Detected patterns and confidence levels
-        """
-        patterns = {}
-        
-        # Minimum data required
-        if len(df) < 30:
-            return {"error": "Insufficient data for pattern detection"}
-        
-        # Get OHLC data for recent period
-        recent_df = df.iloc[-30:]
-        
-        try:
-            # Head and Shoulders pattern
-            # Simplified detection: look for 3 peaks with middle one higher
-            
-            # Double Top pattern
-            rolling_max = recent_df['High'].rolling(5).max()
-            potential_tops = (recent_df['High'] == rolling_max) & (recent_df['High'] > recent_df['High'].shift(1)) & (recent_df['High'] > recent_df['High'].shift(-1))
-            top_indexes = potential_tops[potential_tops].index.tolist()
-            
-            if len(top_indexes) >= 2:
-                # Check if the tops are separated and at similar price levels
-                date_diffs = []
-                price_diffs = []
-                
-                for i in range(1, len(top_indexes)):
-                    # Calculate date difference in days
-                    date_diff = (top_indexes[i] - top_indexes[i-1]).days
-                    if not pd.isna(date_diff):
-                        date_diffs.append(date_diff)
-                    
-                    # Calculate price difference as percentage
-                    high1 = recent_df.loc[top_indexes[i-1], 'High']
-                    high2 = recent_df.loc[top_indexes[i], 'High']
-                    if high1 > 0:  # Avoid division by zero
-                        price_diff = abs(high2 - high1) / high1
-                        price_diffs.append(price_diff)
-                
-                # Check if any pairs meet the criteria
-                if (date_diffs and price_diffs and
-                    any(diff >= 5 and diff <= 20 for diff in date_diffs) and 
-                    any(diff <= 0.03 for diff in price_diffs)):
-                    patterns['double_top'] = {
-                        'detected': True,
-                        'confidence': 'medium',
-                        'implication': 'bearish'
-                    }
-            
-            # Bullish Engulfing pattern
-            bullish_engulfing = (
-                (recent_df['Close'] > recent_df['Open']) &  # Current candle is bullish
-                (recent_df['Close'].shift(1) < recent_df['Open'].shift(1)) &  # Previous candle is bearish
-                (recent_df['Close'] > recent_df['Open'].shift(1)) &  # Current close > previous open
-                (recent_df['Open'] < recent_df['Close'].shift(1))  # Current open < previous close
-            )
-            
-            if bullish_engulfing.any():
-                patterns['bullish_engulfing'] = {
-                    'detected': True,
-                    'confidence': 'high' if bullish_engulfing.iloc[-5:].any() else 'medium',
-                    'implication': 'bullish'
-                }
-            
-            # Bearish Engulfing pattern
-            bearish_engulfing = (
-                (recent_df['Close'] < recent_df['Open']) &  # Current candle is bearish
-                (recent_df['Close'].shift(1) > recent_df['Open'].shift(1)) &  # Previous candle is bullish
-                (recent_df['Close'] < recent_df['Open'].shift(1)) &  # Current close < previous open
-                (recent_df['Open'] > recent_df['Close'].shift(1))  # Current open > previous close
-            )
-            
-            if bearish_engulfing.any():
-                patterns['bearish_engulfing'] = {
-                    'detected': True,
-                    'confidence': 'high' if bearish_engulfing.iloc[-5:].any() else 'medium',
-                    'implication': 'bearish'
-                }
-            
-            # Detect potential support/resistance levels
-            sup_res_levels = self._detect_support_resistance(recent_df)
-            if sup_res_levels:
-                patterns['support_resistance'] = sup_res_levels
-            
-        except Exception as e:
-            print(f"Error in pattern detection: {e}")
-            patterns['error'] = str(e)
-        
-        return patterns
-    
-    def _detect_support_resistance(self, df):
-        """
-        Detect support and resistance levels.
-        
-        Args:
-            df (DataFrame): Price data
-            
-        Returns:
-            dict: Support and resistance levels
-        """
-        try:
-            # Use pivot points for support/resistance detection
-            # Check if we have enough data
-            if len(df) < 3:
-                return {"error": "Insufficient data for support/resistance detection"}
-            
-            # Previous period high, low, close as float values (not numpy or pandas types)
-            prev_high = float(df['High'].iloc[-2])
-            prev_low = float(df['Low'].iloc[-2])
-            prev_close = float(df['Close'].iloc[-2])
-            
-            # Calculate pivot point
-            pivot = float((prev_high + prev_low + prev_close) / 3)
-            
-            # Calculate support and resistance levels as float
-            s1 = float((2 * pivot) - prev_high)
-            s2 = float(pivot - (prev_high - prev_low))
-            r1 = float((2 * pivot) - prev_low)
-            r2 = float(pivot + (prev_high - prev_low))
-            
-            # Current price as float
-            current_price = float(df['Close'].iloc[-1])
-            
-            # Determine closest levels - create primitive Python lists
-            price_levels = [float(s2), float(s1), float(pivot), float(r1), float(r2)]
-            level_names = ["S2", "S1", "Pivot", "R1", "R2"]
-            
-            # Calculate distance to each level
-            try:
-                distances = []
-                for level in price_levels:
-                    if current_price > 0:  # Avoid division by zero
-                        distance = abs(level - current_price) / current_price * 100
-                        distances.append(float(distance))
-                    else:
-                        distances.append(float(0))
-            except Exception as e:
-                print(f"Error calculating distances: {e}")
-                distances = [float(0), float(0), float(0), float(0), float(0)]
-            
-            # Find nearest level
-            try:
-                nearest_idx = distances.index(min(distances))
-            except Exception as e:
-                print(f"Error finding nearest index: {e}")
-                nearest_idx = 2  # Default to pivot
-            
-            nearest_level = level_names[nearest_idx]
-            nearest_value = price_levels[nearest_idx]
-            
-            # Determine if price is near support or resistance
-            is_support = nearest_idx < 2  # S2 or S1
-            is_resistance = nearest_idx > 2  # R1 or R2
-            at_level = False
-            if len(distances) > nearest_idx:
-                at_level = distances[nearest_idx] < 0.5  # Within 0.5% of a level
-            
-            # Convert boolean values to integers for JSON serialization
-            is_support_int = 1 if is_support else 0
-            is_resistance_int = 1 if is_resistance else 0
-            at_level_int = 1 if at_level else 0
-            
-            # Return levels as a dictionary with primitive types only
-            return {
-                'levels': {
-                    'S2': float(s2),
-                    'S1': float(s1),
-                    'Pivot': float(pivot),
-                    'R1': float(r1),
-                    'R2': float(r2)
-                },
-                'nearest': {
-                    'level': str(nearest_level),
-                    'value': float(nearest_value),
-                    'distance_pct': float(distances[nearest_idx]) if nearest_idx < len(distances) else float(0)
-                },
-                'interpretation': {
-                    'is_near_support': is_support_int,
-                    'is_near_resistance': is_resistance_int,
-                    'at_level': at_level_int
-                }
-            }
-        except Exception as e:
-            print(f"Error in support/resistance detection: {e}")
-            return {"error": str(e)}
-        
-    def _generate_technical_summary(self, price, price_change, volatility, 
-                                   indicators, momentum, tsmn):
-        """
-        Generate a human-readable summary of technical analysis.
-        
-        Args:
-            Various technical indicators and metrics
-            
-        Returns:
-            str: Technical analysis summary
-        """
         summary_parts = []
         
         # Price trend summary
         if price_change > 5:
-            price_trend = f"strongly bullish with a {price_change:.1f}% increase"
+            summary_parts.append(f"Price action is strongly bullish with a {price_change:.1f}% increase in this timeframe.")
         elif price_change > 1:
-            price_trend = f"moderately bullish with a {price_change:.1f}% increase"
+            summary_parts.append(f"Price action is moderately bullish with a {price_change:.1f}% increase in this timeframe.")
         elif price_change > -1:
-            price_trend = f"neutral with a small {abs(price_change):.1f}% change"
+            summary_parts.append(f"Price action is neutral with a small {abs(price_change):.1f}% change in this timeframe.")
         elif price_change > -5:
-            price_trend = f"moderately bearish with a {abs(price_change):.1f}% decrease"
+            summary_parts.append(f"Price action is moderately bearish with a {abs(price_change):.1f}% decrease in this timeframe.")
         else:
-            price_trend = f"strongly bearish with a {abs(price_change):.1f}% decrease"
-        
-        summary_parts.append(f"Price action is {price_trend} in this timeframe.")
+            summary_parts.append(f"Price action is strongly bearish with a {abs(price_change):.1f}% decrease in this timeframe.")
         
         # RSI interpretation
-        if 'RSI_14' in indicators:
-            rsi = indicators['RSI_14']
+        if rsi is not None:
             if rsi > 70:
                 summary_parts.append(f"RSI at {rsi:.1f} indicates overbought conditions.")
             elif rsi < 30:
@@ -739,11 +794,8 @@ class AIplusTechnicalAnalyzer:
                 summary_parts.append(f"RSI at {rsi:.1f} is in neutral territory.")
         
         # MACD interpretation
-        if 'MACD' in indicators and 'MACD_Signal' in indicators:
-            macd = indicators['MACD']
-            signal = indicators['MACD_Signal']
-            
-            if macd > signal:
+        if macd is not None and macd_signal is not None:
+            if macd > macd_signal:
                 if macd > 0:
                     summary_parts.append("MACD is positive and above signal line, suggesting bullish momentum.")
                 else:
@@ -755,16 +807,14 @@ class AIplusTechnicalAnalyzer:
                     summary_parts.append("MACD is above zero but below signal line, suggesting potential weakening momentum.")
         
         # Bollinger Bands
-        if 'BB_Percent' in indicators:
-            bb_pct = indicators['BB_Percent']
-            
-            if bb_pct > 1:
+        if bb_percent is not None:
+            if bb_percent > 1:
                 summary_parts.append("Price is above the upper Bollinger Band, indicating strong upward momentum or potential reversal.")
-            elif bb_pct > 0.8:
+            elif bb_percent > 0.8:
                 summary_parts.append("Price is near the upper Bollinger Band, suggesting strong momentum.")
-            elif bb_pct < 0:
+            elif bb_percent < 0:
                 summary_parts.append("Price is below the lower Bollinger Band, indicating strong downward momentum or potential reversal.")
-            elif bb_pct < 0.2:
+            elif bb_percent < 0.2:
                 summary_parts.append("Price is near the lower Bollinger Band, suggesting strong selling pressure.")
             else:
                 summary_parts.append("Price is within the Bollinger Bands, indicating average volatility.")
@@ -780,47 +830,52 @@ class AIplusTechnicalAnalyzer:
             summary_parts.append(f"Volatility is low at {volatility:.1f}%.")
         
         # TSMN interpretation
-        if isinstance(tsmn, dict) and 'value' in tsmn:
-            tsmn_value = tsmn['value']
-            signal = tsmn.get('signal', 'neutral')
-            
-            if signal == 'strong_buy':
+        if tsmn_value != 0:
+            if tsmn_value > 60:
                 summary_parts.append(f"TSMN indicator at {tsmn_value:.1f} shows strong bullish momentum.")
-            elif signal == 'buy':
+            elif tsmn_value > 20:
                 summary_parts.append(f"TSMN indicator at {tsmn_value:.1f} suggests moderate bullish momentum.")
-            elif signal == 'strong_sell':
+            elif tsmn_value < -60:
                 summary_parts.append(f"TSMN indicator at {tsmn_value:.1f} shows strong bearish pressure.")
-            elif signal == 'sell':
+            elif tsmn_value < -20:
                 summary_parts.append(f"TSMN indicator at {tsmn_value:.1f} suggests moderate bearish pressure.")
             else:
                 summary_parts.append(f"TSMN indicator at {tsmn_value:.1f} indicates neutral momentum.")
         
         # Combine all parts
         return " ".join(summary_parts)
-
-
-# Function to get technical data for a specific stock
-def get_aiplus_technical_data(symbol, timeframe='1mo', force_refresh=False):
-    """
-    Get comprehensive technical analysis for a stock.
-    
-    Args:
-        symbol (str): Stock symbol
-        timeframe (str): Time period - '1mo', '3mo', '6mo', '1y'
-        force_refresh (bool): Whether to force refresh data
         
-    Returns:
-        dict: Technical analysis results
-    """
-    analyzer = AIplusTechnicalAnalyzer()
-    return analyzer.get_technical_data(symbol, timeframe, force_refresh)
+    except Exception as e:
+        print(f"Error generating technical summary: {e}")
+        return "Unable to generate technical summary due to an error."
 
 
-# Test function
+# Test code
 if __name__ == "__main__":
-    # Test with a sample stock
-    symbol = "AAPL"
-    timeframe = "1mo"
+    import sys
     
-    result = get_aiplus_technical_data(symbol, timeframe, force_refresh=True)
-    print(json.dumps(result, indent=2))
+    # Get symbol from command line or use default
+    symbol = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
+    print(f"Testing technical analysis for {symbol}...")
+    
+    # Force refresh to get latest data
+    result = get_aiplus_technical_data(symbol, force_refresh=True)
+    
+    # Print results
+    if "error" in result:
+        print(f"Error: {result['error']}")
+    else:
+        print(f"Symbol: {result['symbol']}")
+        print(f"Company: {result['company_name']}")
+        print(f"Current Price: ${result['current_price']:.2f}")
+        print(f"Price Change: {result['price_change_pct']:.2f}%")
+        print(f"Volatility: {result['volatility']:.2f}%")
+        print("\nTSMN Indicator:")
+        print(f"Value: {result['tsmn']['value']:.2f}")
+        print(f"Signal: {result['tsmn']['signal']}")
+        print(f"Strength: {result['tsmn']['strength']}")
+        print("\nKey Technical Indicators:")
+        for key, value in result['standard_indicators'].items():
+            print(f"{key}: {value}")
+        print("\nTechnical Summary:")
+        print(result['technical_summary'])

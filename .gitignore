@@ -62,7 +62,6 @@ secrets/
 
 # Docker-specific
 .dockerignore
-Dockerfile
 docker-compose*.yml
 .docker/
 
