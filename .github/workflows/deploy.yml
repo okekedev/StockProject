@@ -1,11 +1,10 @@
-name: Build and Auto-Deploy Secure Image
+name: Build and Deploy to Azure Container Apps
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  # Allow manual trigger
   workflow_dispatch:
 
 jobs:
@@ -14,31 +13,29 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write  # Required for OIDC authentication
+      id-token: write  # Required for OIDC
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3
 
     - name: Login to GitHub Container Registry
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
         
-    # Create a short SHA for tagging
     - name: Create short SHA
       id: short_sha
-      run: echo "::set-output name=sha::$(git rev-parse --short HEAD)"
+      run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-    # Extract metadata for Docker
     - name: Extract metadata for Docker
       id: meta
-      uses: docker/metadata-action@v4
+      uses: docker/metadata-action@v5
       with:
         images: ghcr.io/${{ github.repository_owner }}/sundai-stocks
         tags: |
@@ -46,9 +43,8 @@ jobs:
           type=raw,value=v${{ github.run_number }},enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
           type=raw,value=${{ steps.short_sha.outputs.sha }},enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
 
-    # Build secure image with NO SECRETS
-    - name: Build and push secure Docker image
-      uses: docker/build-push-action@v4
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
       with:
         context: .
         push: true
@@ -59,29 +55,40 @@ jobs:
         build-args: |
           DEBUG=False
 
-    # Login to Azure using your managed identity
+    # Deploy only on main branch
     - name: Azure Login with OIDC
       if: github.ref == 'refs/heads/main'
-      uses: azure/login@v1
+      uses: azure/login@v2
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    # Deploy with ONLY secrets - no fallback values exposed
-    - name: Auto-deploy to Azure Container Apps
+    - name: Configure private registry access
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "🔐 Configuring private GitHub Container Registry access..."
+        
+        # Configure registry credentials for the container app
+        az containerapp registry set \
+          --name stocks \
+          --resource-group sundai \
+          --server ghcr.io \
+          --username ${{ github.actor }} \
+          --password ${{ secrets.GITHUB_TOKEN }}
+        
+        echo "✅ Registry access configured"
+
+    - name: Deploy to Azure Container Apps
       if: github.ref == 'refs/heads/main'
       run: |
         echo "🚀 Deploying secure image with runtime secrets..."
         
-        # Update container app with new image and environment variables from secrets only
+        # Update the container app with new image and environment variables
         az containerapp update \
           --name stocks \
           --resource-group sundai \
           --image ghcr.io/${{ github.repository_owner }}/sundai-stocks:latest \
-          --registry-server ghcr.io \
-          --registry-username ${{ github.actor }} \
-          --registry-password ${{ secrets.GITHUB_TOKEN }} \
           --set-env-vars \
             DASH_USERNAME="${{ secrets.DASH_USERNAME }}" \
             DASH_PASSWORD_HASH="${{ secrets.DASH_PASSWORD_HASH }}" \
@@ -89,27 +96,35 @@ jobs:
             GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
             NEWS_API_KEY="${{ secrets.NEWS_API_KEY }}" \
             DEBUG="False"
+        
+        echo "✅ Deployment completed successfully!"
 
-    # Show successful deployment info
-    - name: Deployment completed
+    - name: Verify deployment
       if: github.ref == 'refs/heads/main'
       run: |
-        echo "✅ Deployment completed successfully!"
-        echo ""
-        echo "🔒 Security Status:"
-        echo "   ✅ Secure image built (no secrets in Docker image)"
-        echo "   ✅ Pushed to GitHub Packages: ghcr.io/okekedev/sundai-stocks:latest"
-        echo "   ✅ Deployed to Azure with runtime environment variables from GitHub Secrets"
-        echo "   ✅ All secrets managed securely - none exposed in workflow"
-        echo ""
-        echo "🌐 Your app is live at:"
-        echo "   https://stocks.grayocean-b61637cb.southcentralus.azurecontainerapps.io"
-        echo ""
-        echo "📊 Latest revision info:"
+        echo "🔍 Verifying deployment status..."
         
-        # Show the current active revision
+        # Show the current revision status
         az containerapp revision list \
           --name stocks \
           --resource-group sundai \
-          --query "[?properties.active].{Name:name,Created:properties.createdTime,Traffic:properties.trafficWeight}" \
+          --query '[0].{Name:name,Active:properties.active,CreatedTime:properties.createdTime,Image:properties.template.containers[0].image,TrafficWeight:properties.trafficWeight}' \
           --output table
+        
+        # Get the app URL
+        APP_URL=$(az containerapp show \
+          --name stocks \
+          --resource-group sundai \
+          --query 'properties.configuration.ingress.fqdn' \
+          --output tsv)
+        
+        if [ ! -z "$APP_URL" ]; then
+          echo "🌐 Application available at: https://$APP_URL"
+        fi
+        
+        echo "📊 Deployment summary:"
+        echo "- Image: ghcr.io/${{ github.repository_owner }}/sundai-stocks:latest"
+        echo "- Build: v${{ github.run_number }}"
+        echo "- Commit: ${{ steps.short_sha.outputs.sha }}"
+        echo "- Registry: Private (ghcr.io)"
+        echo "- Status: ✅ Deployed"
