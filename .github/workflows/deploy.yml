@@ -22,6 +22,7 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
+    # ✅ KEEP using GITHUB_TOKEN for build/push - this works fine
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v3
       with:
@@ -64,20 +65,27 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Configure private registry access
+    # 🔑 KEY CHANGE: Use PAT instead of GITHUB_TOKEN for Azure registry config
+    - name: Configure private registry access with PAT
       if: github.ref == 'refs/heads/main'
       run: |
-        echo "🔐 Configuring private GitHub Container Registry access..."
+        echo "🔐 Configuring private GitHub Container Registry access with PAT..."
         
-        # Configure registry credentials for the container app
+        # Remove any existing registry configuration first
+        az containerapp registry remove \
+          --name stocks \
+          --resource-group sundai \
+          --server ghcr.io || echo "No existing registry config to remove"
+        
+        # Configure registry credentials with PAT for persistent access
         az containerapp registry set \
           --name stocks \
           --resource-group sundai \
           --server ghcr.io \
           --username ${{ github.actor }} \
-          --password ${{ secrets.GITHUB_TOKEN }}
+          --password ${{ secrets.GHCR_TOKEN }}
         
-        echo "✅ Registry access configured"
+        echo "✅ Registry access configured with PAT"
 
     - name: Deploy to Azure Container Apps
       if: github.ref == 'refs/heads/main'
@@ -99,10 +107,13 @@ jobs:
         
         echo "✅ Deployment completed successfully!"
 
-    - name: Verify deployment
+    - name: Verify deployment and check app health
       if: github.ref == 'refs/heads/main'
       run: |
         echo "🔍 Verifying deployment status..."
+        
+        # Wait a moment for the deployment to settle
+        sleep 30
         
         # Show the current revision status
         az containerapp revision list \
@@ -120,11 +131,19 @@ jobs:
         
         if [ ! -z "$APP_URL" ]; then
           echo "🌐 Application available at: https://$APP_URL"
+          
+          # Try to check if the app is responding
+          echo "🏥 Checking application health..."
+          if curl -f -s --max-time 30 "https://$APP_URL" > /dev/null; then
+            echo "✅ Application is responding successfully!"
+          else
+            echo "⚠️ Application may still be starting up. Check logs in Azure portal."
+          fi
         fi
         
         echo "📊 Deployment summary:"
         echo "- Image: ghcr.io/${{ github.repository_owner }}/sundai-stocks:latest"
         echo "- Build: v${{ github.run_number }}"
         echo "- Commit: ${{ steps.short_sha.outputs.sha }}"
-        echo "- Registry: Private (ghcr.io)"
+        echo "- Registry: Private (ghcr.io) with PAT authentication"
         echo "- Status: ✅ Deployed"
